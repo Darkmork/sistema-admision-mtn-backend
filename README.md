@@ -433,9 +433,3 @@ chore(deps): update dependencies
 ## 📄 Licencia
 
 ISC - Colegio Monte Tabor y Nazaret
-
----
-
-**Desarrollado con** ❤️ **para el Colegio Monte Tabor y Nazaret**
-
-🤖 *Backend generado con [Claude Code](https://claude.com/claude-code)*
