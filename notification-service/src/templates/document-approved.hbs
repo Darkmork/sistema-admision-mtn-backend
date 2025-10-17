@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documento Aprobado</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      background-color: #28a745;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      border-radius: 5px 5px 0 0;
+    }
+    .content {
+      background-color: #f9f9f9;
+      padding: 30px;
+      border: 1px solid #ddd;
+      border-top: none;
+    }
+    .success-icon {
+      text-align: center;
+      font-size: 48px;
+      margin: 20px 0;
+    }
+    .document-list {
+      background-color: white;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      margin: 20px 0;
+    }
+    .document-list ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .document-list li {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .document-list li:last-child {
+      border-bottom: none;
+    }
+    .footer {
+      background-color: #f0f0f0;
+      padding: 15px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+      border-radius: 0 0 5px 5px;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #28a745;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>✓ Documento Aprobado</h1>
+  </div>
+  <div class="content">
+    <div class="success-icon">✅</div>
+
+    <p>Estimado/a {{guardianName}},</p>
+
+    <p>Nos complace informarle que el documento que ha enviado para la postulación de <strong>{{studentName}}</strong> ha sido aprobado exitosamente.</p>
+
+    <div class="document-list">
+      <h3>Documento aprobado:</h3>
+      <ul>
+        <li>
+          <strong>{{documentType}}</strong>
+          <br>
+          <small>Enviado el: {{uploadDate}}</small>
+          {{#if reviewedBy}}
+          <br>
+          <small>Revisado por: {{reviewedBy}}</small>
+          {{/if}}
+        </li>
+      </ul>
+    </div>
+
+    {{#if comments}}
+    <p><strong>Comentarios del revisor:</strong></p>
+    <p>{{comments}}</p>
+    {{/if}}
+
+    {{#if pendingDocuments}}
+    <p><strong>Documentos pendientes:</strong></p>
+    <div class="document-list">
+      <ul>
+        {{#each pendingDocuments}}
+        <li>{{this}}</li>
+        {{/each}}
+      </ul>
+    </div>
+    <p>Por favor, envíe los documentos pendientes a la brevedad para continuar con el proceso de admisión.</p>
+    {{else}}
+    <p><strong>¡Felicitaciones!</strong> Ha completado la carga de todos los documentos requeridos.</p>
+    {{/if}}
+
+    <a href="{{dashboardUrl}}" class="button">Ver Estado de Postulación</a>
+
+    <p>Si tiene alguna consulta, no dude en contactarnos.</p>
+
+    <p>Atentamente,<br>
+    <strong>Equipo de Admisión</strong><br>
+    Colegio Monte Tabor y Nazaret</p>
+  </div>
+  <div class="footer">
+    <p>&copy; {{year}} Colegio Monte Tabor y Nazaret. Todos los derechos reservados.</p>
+    <p>Este es un correo automático, por favor no responder.</p>
+  </div>
+</body>
+</html>

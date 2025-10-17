@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bienvenido a Colegio Monte Tabor y Nazaret</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      background-color: #003366;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      border-radius: 5px 5px 0 0;
+    }
+    .content {
+      background-color: #f9f9f9;
+      padding: 30px;
+      border: 1px solid #ddd;
+      border-top: none;
+    }
+    .footer {
+      background-color: #f0f0f0;
+      padding: 15px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+      border-radius: 0 0 5px 5px;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #003366;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>¡Bienvenido a Colegio Monte Tabor y Nazaret!</h1>
+  </div>
+  <div class="content">
+    <p>Estimado/a {{firstName}} {{lastName}},</p>
+
+    <p>Nos complace darle la bienvenida al Sistema de Admisión del Colegio Monte Tabor y Nazaret.</p>
+
+    <p>Su cuenta ha sido creada exitosamente con los siguientes datos:</p>
+
+    <ul>
+      <li><strong>Email:</strong> {{email}}</li>
+      <li><strong>Rol:</strong> {{role}}</li>
+    </ul>
+
+    <p>Puede acceder al sistema utilizando el siguiente enlace:</p>
+
+    <a href="{{loginUrl}}" class="button">Acceder al Sistema</a>
+
+    <p>Si tiene alguna pregunta o necesita asistencia, no dude en contactarnos.</p>
+
+    <p>Atentamente,<br>
+    <strong>Equipo de Admisión</strong><br>
+    Colegio Monte Tabor y Nazaret</p>
+  </div>
+  <div class="footer">
+    <p>&copy; {{year}} Colegio Monte Tabor y Nazaret. Todos los derechos reservados.</p>
+    <p>Este es un correo automático, por favor no responder.</p>
+  </div>
+</body>
+</html>

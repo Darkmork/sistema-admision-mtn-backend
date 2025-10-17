@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Actualización de Estado de Postulación</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      background-color: #003366;
+      color: white;
+      padding: 20px;
+      text-align: center;
+      border-radius: 5px 5px 0 0;
+    }
+    .content {
+      background-color: #f9f9f9;
+      padding: 30px;
+      border: 1px solid #ddd;
+      border-top: none;
+    }
+    .status-box {
+      background-color: {{statusColor}};
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      text-align: center;
+      margin: 20px 0;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+    .info-table td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    .info-table td:first-child {
+      font-weight: bold;
+      width: 40%;
+    }
+    .footer {
+      background-color: #f0f0f0;
+      padding: 15px;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+      border-radius: 0 0 5px 5px;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 24px;
+      background-color: #003366;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Actualización de Estado de Postulación</h1>
+  </div>
+  <div class="content">
+    <p>Estimado/a {{guardianName}},</p>
+
+    <p>Le informamos que el estado de la postulación de <strong>{{studentName}}</strong> ha sido actualizado.</p>
+
+    <div class="status-box">
+      {{statusText}}
+    </div>
+
+    <table class="info-table">
+      <tr>
+        <td>Estudiante:</td>
+        <td>{{studentName}}</td>
+      </tr>
+      <tr>
+        <td>Grado:</td>
+        <td>{{grade}}</td>
+      </tr>
+      <tr>
+        <td>Año Académico:</td>
+        <td>{{academicYear}}</td>
+      </tr>
+      <tr>
+        <td>Estado Actual:</td>
+        <td><strong>{{statusText}}</strong></td>
+      </tr>
+      <tr>
+        <td>Fecha de Actualización:</td>
+        <td>{{updateDate}}</td>
+      </tr>
+    </table>
+
+    {{#if message}}
+    <p><strong>Mensaje adicional:</strong></p>
+    <p>{{message}}</p>
+    {{/if}}
+
+    {{#if nextSteps}}
+    <p><strong>Próximos pasos:</strong></p>
+    <p>{{nextSteps}}</p>
+    {{/if}}
+
+    <a href="{{dashboardUrl}}" class="button">Ver Detalles en el Sistema</a>
+
+    <p>Si tiene alguna consulta, no dude en contactarnos.</p>
+
+    <p>Atentamente,<br>
+    <strong>Equipo de Admisión</strong><br>
+    Colegio Monte Tabor y Nazaret</p>
+  </div>
+  <div class="footer">
+    <p>&copy; {{year}} Colegio Monte Tabor y Nazaret. Todos los derechos reservados.</p>
+    <p>Este es un correo automático, por favor no responder.</p>
+  </div>
+</body>
+</html>

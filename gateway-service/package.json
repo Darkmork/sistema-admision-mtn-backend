@@ -1,0 +1,42 @@
+{
+  "name": "gateway-service",
+  "version": "1.0.0",
+  "description": "NGINX API Gateway para el sistema de admisión MTN - Enruta peticiones a microservicios",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "nginx:start": "nginx -c $(pwd)/config/nginx.conf",
+    "nginx:stop": "nginx -s stop",
+    "nginx:reload": "nginx -s reload",
+    "nginx:test": "nginx -t -c $(pwd)/config/nginx.conf",
+    "health:check": "node src/health-check.js",
+    "test": "jest --coverage"
+  },
+  "keywords": [
+    "gateway",
+    "nginx",
+    "api-gateway",
+    "reverse-proxy",
+    "mtn",
+    "admission"
+  ],
+  "author": "MTN Development Team",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^5.1.0",
+    "axios": "^1.7.9",
+    "winston": "^3.18.3",
+    "winston-daily-rotate-file": "^5.0.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9",
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0",
+    "nginx": ">=1.18.0"
+  }
+}

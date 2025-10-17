@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  evaluation-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: evaluation-service
+    ports:
+      - "8084:8084"
+    environment:
+      NODE_ENV: production
+      PORT: 8084
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-Admisión_MTN_DB}
+      DB_USERNAME: ${DB_USERNAME:-admin}
+      DB_PASSWORD: ${DB_PASSWORD:-admin123}
+      DB_POOL_MAX: 20
+      JWT_SECRET: ${JWT_SECRET:-your_secure_jwt_secret}
+      LOG_DIR: /app/logs
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    networks:
+      - mtn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8084/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  mtn-network:
+    driver: bridge

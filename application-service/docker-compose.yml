@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  application-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: application-service
+    ports:
+      - "8083:8083"
+    environment:
+      NODE_ENV: production
+      PORT: 8083
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-Admisión_MTN_DB}
+      DB_USERNAME: ${DB_USERNAME:-admin}
+      DB_PASSWORD: ${DB_PASSWORD:-admin123}
+      DB_POOL_MAX: 20
+      JWT_SECRET: ${JWT_SECRET:-your_secure_jwt_secret}
+      UPLOAD_DIR: /app/uploads
+      LOG_DIR: /app/logs
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    networks:
+      - mtn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8083/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      - postgres
+
+  # PostgreSQL Database (opcional - comentado si ya tienes uno externo)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: postgres-mtn
+  #   environment:
+  #     POSTGRES_DB: Admisión_MTN_DB
+  #     POSTGRES_USER: admin
+  #     POSTGRES_PASSWORD: admin123
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   networks:
+  #     - mtn-network
+  #   restart: unless-stopped
+
+networks:
+  mtn-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

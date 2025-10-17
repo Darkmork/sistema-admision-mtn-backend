@@ -1,0 +1,57 @@
+/**
+ * Document Routes
+ * Defines HTTP routes for document endpoints
+ */
+
+const express = require('express');
+const router = express.Router();
+const DocumentController = require('../controllers/DocumentController');
+const { authenticate, requireRole } = require('../middleware/auth');
+const { upload } = require('../middleware/upload');
+
+// Upload documents (multipart/form-data)
+router.post(
+  '/',
+  authenticate,
+  upload.array('files'),
+  DocumentController.uploadDocuments.bind(DocumentController)
+);
+
+// Get documents by application ID
+router.get(
+  '/:applicationId/documents',
+  authenticate,
+  DocumentController.getDocumentsByApplicationId.bind(DocumentController)
+);
+
+// Download document
+router.get(
+  '/:id/download',
+  authenticate,
+  DocumentController.downloadDocument.bind(DocumentController)
+);
+
+// View document inline
+router.get(
+  '/view/:id',
+  authenticate,
+  DocumentController.viewDocument.bind(DocumentController)
+);
+
+// Update document approval status
+router.put(
+  '/:id/approval',
+  authenticate,
+  requireRole('ADMIN', 'COORDINATOR'),
+  DocumentController.updateDocumentApproval.bind(DocumentController)
+);
+
+// Delete document
+router.delete(
+  '/:id',
+  authenticate,
+  requireRole('ADMIN'),
+  DocumentController.deleteDocument.bind(DocumentController)
+);
+
+module.exports = router;
