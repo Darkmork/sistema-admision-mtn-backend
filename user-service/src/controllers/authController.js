@@ -1,8 +1,22 @@
 const AuthService = require('../services/authService');
+const { generateCsrfToken } = require('../middleware/csrfMiddleware');
 
 class AuthController {
   constructor(dbPool, circuitBreakers) {
     this.authService = new AuthService(dbPool, circuitBreakers.medium);
+  }
+
+  /**
+   * GET /api/auth/csrf-token
+   * Generate and return a CSRF token
+   */
+  getCsrfToken(req, res) {
+    const csrfToken = generateCsrfToken();
+    res.json({
+      success: true,
+      csrfToken,
+      expiresIn: 3600 // 1 hour in seconds
+    });
   }
 
   /**

@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const { createDatabasePool } = require('./config/database');
 const { createCircuitBreakers } = require('./config/circuitBreaker');
 const authRoutes = require('./routes/authRoutes');
@@ -16,7 +15,7 @@ const dbPool = createDatabasePool();
 const { simpleQueryBreaker, mediumQueryBreaker, writeOperationBreaker } = createCircuitBreakers();
 
 // Middleware
-app.use(cors());
+// Note: CORS is handled by NGINX Gateway, not by individual services
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

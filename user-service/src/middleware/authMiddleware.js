@@ -1,37 +1,70 @@
 /**
  * Authentication Middleware
  *
- * JWT token validation middleware
+ * JWT token validation middleware with signature verification
  */
+
+const jwt = require('jsonwebtoken');
+
+// JWT secret from environment (must match authService.js)
+const JWT_SECRET = process.env.JWT_SECRET || 'default-jwt-secret-change-in-production';
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token || token.split('.').length !== 3) {
+  if (!token) {
     return res.status(401).json({
       success: false,
-      error: 'Access token required'
+      error: {
+        code: 'AUTH_001',
+        message: 'Access token required'
+      }
     });
   }
 
   try {
-    // Decode JWT payload (base64 decode the middle part)
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+    // Verify JWT signature and decode payload
+    const decoded = jwt.verify(token, JWT_SECRET, {
+      algorithms: ['HS256']
+    });
+
     req.user = {
-      userId: payload.userId,
-      email: payload.email,
-      role: payload.role
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role
     };
     next();
   } catch (error) {
-    // Fallback for hardcoded tokens during development
-    req.user = {
-      userId: "1",
-      email: "jorge.gangale@mtn.cl",
-      role: "ADMIN"
-    };
-    next();
+    // Handle specific JWT errors
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'AUTH_004',
+          message: 'Token expired'
+        }
+      });
+    }
+
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: 'AUTH_003',
+          message: 'Invalid signature'
+        }
+      });
+    }
+
+    // Generic token validation error
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: 'AUTH_002',
+        message: 'Invalid token format'
+      }
+    });
   }
 };
 

@@ -1,7 +1,11 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 // BCrypt rounds optimized for Railway shared vCPU
 const BCRYPT_ROUNDS = 8;
+
+// JWT secret from environment
+const JWT_SECRET = process.env.JWT_SECRET || 'default-jwt-secret-change-in-production';
 
 class AuthService {
   constructor(dbPool, mediumQueryBreaker) {
@@ -173,16 +177,17 @@ class AuthService {
    * @returns {string} JWT token
    */
   createJWT(user) {
-    const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString('base64');
-    const payload = Buffer.from(JSON.stringify({
+    const payload = {
       userId: user.id.toString(),
       email: user.email,
-      role: user.role,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
-    })).toString('base64');
-    const signature = "mock-signature";
-    return `${header}.${payload}.${signature}`;
+      role: user.role
+    };
+
+    // Sign token with HS256 algorithm and 24-hour expiration
+    return jwt.sign(payload, JWT_SECRET, {
+      algorithm: 'HS256',
+      expiresIn: '24h'
+    });
   }
 }
 

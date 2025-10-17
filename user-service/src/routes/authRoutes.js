@@ -1,6 +1,7 @@
 const express = require('express');
 const AuthController = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/authMiddleware');
+const { validateCsrf } = require('../middleware/csrfMiddleware');
 
 const router = express.Router();
 
@@ -15,8 +16,9 @@ router.use((req, res, next) => {
 });
 
 // Public endpoints
-router.post('/login', (req, res) => authController.login(req, res));
-router.post('/register', (req, res) => authController.register(req, res));
+router.get('/csrf-token', (req, res) => authController.getCsrfToken(req, res));
+router.post('/login', validateCsrf, (req, res) => authController.login(req, res));
+router.post('/register', validateCsrf, (req, res) => authController.register(req, res));
 router.get('/check-email', (req, res) => authController.checkEmail(req, res));
 
 // Protected endpoints
