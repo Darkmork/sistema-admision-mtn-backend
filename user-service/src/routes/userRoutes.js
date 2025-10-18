@@ -533,7 +533,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
       rut: user.rut,
       phone: user.phone,
       active: user.active,
-      emailVerified: user.email_verified
+      emailVerified: user.email_verified,
+      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
     });
   } catch (error) {
     res.status(500).json({
