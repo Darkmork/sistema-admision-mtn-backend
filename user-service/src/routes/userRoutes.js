@@ -42,7 +42,8 @@ router.get('/public/school-staff', async (req, res) => {
       subject: user.subject,
       rut: user.rut,
       phone: user.phone,
-      active: user.active
+      active: user.active,
+      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
     }));
 
     res.json({
@@ -340,7 +341,8 @@ router.get('/staff', authenticateToken, async (req, res) => {
 
     const users = result.rows.map(user => ({
       ...user,
-      fullName: `${user.firstName} ${user.lastName}`
+      fullName: `${user.firstName} ${user.lastName}`,
+      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
     }));
 
     res.json({
