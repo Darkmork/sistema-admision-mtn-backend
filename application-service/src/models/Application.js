@@ -27,29 +27,37 @@ class Application {
   }
 
   /**
-   * Convert to JSON (camelCase)
+   * Convert to JSON (camelCase with nested objects for frontend compatibility)
    */
   toJSON() {
     return {
       id: this.id,
+      // Nested student object (frontend expects this structure)
+      student: {
+        firstName: this.studentFirstName,
+        lastName: this.studentPaternalLastName, // Usar paternal como lastName principal
+        paternalLastName: this.studentPaternalLastName,
+        maternalLastName: this.studentMaternalLastName,
+        rut: this.studentRUT,
+        birthDate: this.studentDateOfBirth,
+        gender: this.studentGender,
+        gradeApplied: this.gradeAppliedFor
+      },
+      // Flat fields for backward compatibility
       studentFirstName: this.studentFirstName,
       studentPaternalLastName: this.studentPaternalLastName,
       studentMaternalLastName: this.studentMaternalLastName,
       studentRUT: this.studentRUT,
-      studentDateOfBirth: this.studentDateOfBirth,
-      studentGender: this.studentGender,
-      gradeAppliedFor: this.gradeAppliedFor,
-      guardianRUT: this.guardianRUT,
-      guardianEmail: this.guardianEmail,
-      applicationYear: this.applicationYear,
       status: this.status,
-      submittedAt: this.submittedAt,
-      reviewedAt: this.reviewedAt,
-      reviewedBy: this.reviewedBy,
-      notes: this.notes,
+      submissionDate: this.submittedAt,
       isArchived: this.isArchived,
       createdAt: this.createdAt,
-      updatedAt: this.updatedAt
+      updatedAt: this.updatedAt,
+      // Additional fields
+      applicationYear: this.applicationYear,
+      reviewedAt: this.reviewedAt,
+      reviewedBy: this.reviewedBy,
+      notes: this.notes
     };
   }
 

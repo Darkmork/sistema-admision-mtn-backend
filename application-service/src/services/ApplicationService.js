@@ -17,27 +17,38 @@ class ApplicationService {
       const { status, applicationYear, guardianRUT } = filters;
       const offset = page * limit;
 
-      let query = 'SELECT * FROM applications WHERE 1=1';
+      // Include student data with LEFT JOIN
+      let query = `
+        SELECT a.*,
+               s.rut as student_rut,
+               s.first_name as student_first_name,
+               s.paternal_last_name as student_paternal_last_name,
+               s.maternal_last_name as student_maternal_last_name,
+               s.grade_applied as student_grade_applied
+        FROM applications a
+        LEFT JOIN students s ON a.student_id = s.id
+        WHERE 1=1
+      `;
       const params = [];
       let paramIndex = 1;
 
       if (status) {
-        query += ` AND status = $${paramIndex++}`;
+        query += ` AND a.status = $${paramIndex++}`;
         params.push(status);
       }
 
       if (applicationYear) {
-        query += ` AND application_year = $${paramIndex++}`;
+        query += ` AND a.application_year = $${paramIndex++}`;
         params.push(applicationYear);
       }
 
       if (guardianRUT) {
-        query += ` AND guardian_rut = $${paramIndex++}`;
+        query += ` AND a.guardian_rut = $${paramIndex++}`;
         params.push(guardianRUT);
       }
 
-      query += ' AND is_archived = false';
-      query += ` ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex}`;
+      query += ' AND a.is_archived = false';
+      query += ` ORDER BY a.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex}`;
       params.push(limit, offset);
 
       const result = await dbPool.query(query, params);

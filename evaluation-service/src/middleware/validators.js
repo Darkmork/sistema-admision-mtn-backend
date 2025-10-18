@@ -31,14 +31,17 @@ const updateEvaluationSchema = Joi.object({
 // Interview creation schema
 const createInterviewSchema = Joi.object({
   applicationId: Joi.number().integer().positive().required(),
-  interviewType: Joi.string().valid(
-    'FAMILY_INTERVIEW', 'STUDENT_INTERVIEW', 'DIRECTOR_INTERVIEW'
+  interviewerId: Joi.number().integer().positive().required(),
+  secondInterviewerId: Joi.number().integer().positive().allow(null),
+  type: Joi.string().valid(
+    'FAMILY', 'STUDENT', 'DIRECTOR', 'PSYCHOLOGIST', 'ACADEMIC'
   ).required(),
-  scheduledDate: Joi.date().iso().min('now').required(),
-  scheduledTime: Joi.string().pattern(/^([01]\d|2[0-3]):([0-5]\d)$/).required(),
-  duration: Joi.number().integer().min(15).max(180).default(45),
-  location: Joi.string().max(200).allow('', null),
   mode: Joi.string().valid('IN_PERSON', 'VIRTUAL', 'HYBRID').default('IN_PERSON'),
+  scheduledDate: Joi.string().required(), // Changed to string to accept date format from frontend
+  scheduledTime: Joi.string().pattern(/^([01]\d|2[0-3]):([0-5]\d)/).required(),
+  duration: Joi.number().integer().min(15).max(180).default(60),
+  location: Joi.string().max(200).allow('', null),
+  status: Joi.string().valid('SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'RESCHEDULED').default('SCHEDULED'),
   notes: Joi.string().max(1000).allow('', null)
 });
 

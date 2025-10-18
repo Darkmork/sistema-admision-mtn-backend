@@ -7,6 +7,7 @@ const { fail } = require('./utils/responseHelpers');
 // Import routes
 const evaluationRoutes = require('./routes/evaluationRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
+const interviewerScheduleRoutes = require('./routes/interviewerScheduleRoutes');
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/interviews', interviewRoutes);
+app.use('/api/interviewer-schedules', interviewerScheduleRoutes);
 
 // 404 handler
 app.use((req, res) => {
