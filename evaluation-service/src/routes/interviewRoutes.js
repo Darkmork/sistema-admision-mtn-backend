@@ -174,8 +174,10 @@ router.get('/available-slots', authenticate, async (req, res) => {
       });
     }
 
-    // Parse date and get day of week
-    const targetDate = new Date(date);
+    // Parse date correctly to avoid timezone issues
+    // Input format: 'YYYY-MM-DD'
+    const [yearStr, monthStr, dayStr] = date.split('-');
+    const targetDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, parseInt(dayStr));
     const dayOfWeek = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][targetDate.getDay()];
     const year = targetDate.getFullYear();
 
