@@ -4,14 +4,6 @@ FROM nginx:1.25-alpine
 # Install necessary tools
 RUN apk add --no-cache curl
 
-# Remove default nginx config
-RUN rm /etc/nginx/nginx.conf
-RUN rm -rf /etc/nginx/conf.d/*
-
-# Create log directory
-RUN mkdir -p /var/log/nginx && \
-    chown -R nginx:nginx /var/log/nginx
-
 # Expose port
 EXPOSE 8080
 
