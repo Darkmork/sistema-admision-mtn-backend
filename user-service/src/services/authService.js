@@ -109,7 +109,7 @@ class AuthService {
     try {
       // Check if email exists
       const existingUserQuery = await client.query(
-        'SELECT id FROM users WHERE email = $1',
+        'SELECT id, email FROM users WHERE email = $1',
         [email.toLowerCase().trim()]
       );
 
@@ -119,6 +119,19 @@ class AuthService {
           await client.query('DELETE FROM users WHERE email = $1', [email.toLowerCase().trim()]);
         } else {
           throw new Error('Este email ya está registrado en el sistema');
+        }
+      }
+
+      // Check if RUT exists (if RUT is provided)
+      if (rut && rut.trim()) {
+        const existingRutQuery = await client.query(
+          'SELECT id, email, rut FROM users WHERE rut = $1',
+          [rut.trim()]
+        );
+
+        if (existingRutQuery.rows.length > 0) {
+          const existingUser = existingRutQuery.rows[0];
+          throw new Error(`Este RUT ya está registrado en el sistema con el email: ${existingUser.email}`);
         }
       }
 
@@ -135,17 +148,30 @@ class AuthService {
         ) RETURNING id, first_name, last_name, email, role, active, email_verified, created_at
       `;
 
-      const insertResult = await client.query(insertQuery, [
-        firstName.trim(),
-        lastName.trim(),
-        email.toLowerCase().trim(),
-        hashedPassword,
-        rut ? rut.trim() : null,
-        phone ? phone.trim() : null,
-        'APODERADO',
-        true,
-        true
-      ]);
+      let insertResult;
+      try {
+        insertResult = await client.query(insertQuery, [
+          firstName.trim(),
+          lastName.trim(),
+          email.toLowerCase().trim(),
+          hashedPassword,
+          rut ? rut.trim() : null,
+          phone ? phone.trim() : null,
+          'APODERADO',
+          true,
+          true
+        ]);
+      } catch (dbError) {
+        // Handle database constraint violations
+        if (dbError.code === '23505') { // Unique violation
+          if (dbError.constraint === 'uk6dotkott2kjsp8vw4d0m25fb7') {
+            throw new Error('Este email ya está registrado en el sistema');
+          } else if (dbError.constraint === 'ukscuj1snh0iy35s195t3qff5o') {
+            throw new Error('Este RUT ya está registrado en el sistema');
+          }
+        }
+        throw dbError;
+      }
 
       const newUser = insertResult.rows[0];
       const token = this.createJWT(newUser);
