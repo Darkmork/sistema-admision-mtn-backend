@@ -18,9 +18,5 @@ RUN mkdir -p /var/log/nginx && \
 # Expose port
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8080/gateway/status || exit 1
-
 # Start nginx in foreground
 CMD ["nginx", "-g", "daemon off;"]

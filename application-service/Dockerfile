@@ -9,12 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies (prefer lockfile, fallback without it)
-RUN if [ -f package-lock.json ]; then \
-      npm ci --omit=dev; \
-    else \
-      npm install --omit=dev; \
-    fi && \
-    npm cache clean --force
+RUN npm install --omit=dev; \
 
 # Stage 2: Production
 FROM node:18-alpine
@@ -43,10 +38,6 @@ USER nodejs
 
 # Expose port
 EXPOSE 8083
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:8083/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"
 
 # Start with dumb-init
 ENTRYPOINT ["dumb-init", "--"]
