@@ -4,6 +4,7 @@ const { createDatabasePool } = require('./config/database');
 const { createCircuitBreakers } = require('./config/circuitBreaker');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+const debugRoutes = require('./routes/debugRoutes');
 
 const app = express();
 const port = process.env.PORT || 8082;
@@ -29,6 +30,11 @@ app.use((req, res, next) => {
   };
   next();
 });
+
+// Mount debug routes only in development or when explicitly enabled
+if (process.env.NODE_ENV === 'development' || process.env.ENABLE_DEBUG_ROUTES === 'true') {
+  app.use('/internal', debugRoutes);
+}
 
 // Health check
 app.get('/health', (req, res) => {
