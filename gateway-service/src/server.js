@@ -178,7 +178,7 @@ app.get('/gateway/status', (req, res) => {
 // Configuración de proxy para cada microservicio
 const proxyOptions = {
   changeOrigin: true,
-  onProxyReq: (proxyReq, req, res) => {
+  onProxyReq: (proxyReq, req) => {
     // Propagar el token de autorización al microservicio
     if (req.headers.authorization) {
       proxyReq.setHeader('Authorization', req.headers.authorization);
@@ -191,85 +191,61 @@ const proxyOptions = {
       proxyReq.setHeader('X-User-Role', req.user.role);
     }
   },
-  onError: (err, req, res) => {
-    logger.error(`Proxy error for ${req.path}:`, err.message);
-    res.status(502).json({
-      success: false,
-      error: {
-        code: 'GATEWAY_ERROR',
-        message: 'Error al comunicarse con el servicio',
-        details: err.message
-      }
-    });
-  },
   logLevel: 'warn'
 };
 
-// Proxy para User Service
-app.use('/api/users', createProxyMiddleware({
+// Helper para crear proxies con logs de diagnóstico (incluye target)
+const makeProxy = (target, pathRewrite) => createProxyMiddleware({
   ...proxyOptions,
-  target: SERVICES.USER_SERVICE,
-  pathRewrite: { '^/api/users': '/api/users' }
-}));
+  target,
+  pathRewrite,
+  onError: (err, req, res) => {
+    // Loguear información detallada para depuración
+    logger.error(`Proxy error to ${target} for ${req.method} ${req.originalUrl}: ${err && err.message}`, { stack: err && err.stack });
 
-app.use('/api/auth', createProxyMiddleware({
-  ...proxyOptions,
-  target: SERVICES.USER_SERVICE,
-  pathRewrite: { '^/api/auth': '/api/auth' }
-}));
+    // Si no se han enviado headers aún, responder con 502 y detalles mínimos
+    if (!res.headersSent) {
+      res.status(502).json({
+        success: false,
+        error: {
+          code: 'GATEWAY_ERROR',
+          message: 'Error al comunicarse con el servicio',
+          details: err && err.message,
+          target
+        }
+      });
+    }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    logger.info(`Proxy response from ${target} for ${req.method} ${req.originalUrl}: ${proxyRes.statusCode}`);
+  }
+});
+
+// Proxy para User Service
+app.use('/api/users', makeProxy(SERVICES.USER_SERVICE, { '^/api/users': '/api/users' }));
+
+app.use('/api/auth', makeProxy(SERVICES.USER_SERVICE, { '^/api/auth': '/api/auth' }));
 
 // Proxy para Application Service
-app.use('/api/applications', createProxyMiddleware({
-  ...proxyOptions,
-  target: SERVICES.APPLICATION_SERVICE,
-  pathRewrite: { '^/api/applications': '/api/applications' }
-}));
+app.use('/api/applications', makeProxy(SERVICES.APPLICATION_SERVICE, { '^/api/applications': '/api/applications' }));
 
-app.use('/api/students', createProxyMiddleware({
-  ...proxyOptions,
-  target: SERVICES.APPLICATION_SERVICE,
-  pathRewrite: { '^/api/students': '/api/students' }
-}));
+app.use('/api/students', makeProxy(SERVICES.APPLICATION_SERVICE, { '^/api/students': '/api/students' }));
 
-app.use('/api/documents', createProxyMiddleware({
-  ...proxyOptions,
-  target: SERVICES.APPLICATION_SERVICE,
-  pathRewrite: { '^/api/documents': '/api/documents' }
-}));
+app.use('/api/documents', makeProxy(SERVICES.APPLICATION_SERVICE, { '^/api/documents': '/api/documents' }));
 
 // Proxy para Evaluation Service
-app.use('/api/evaluations', createProxyMiddleware({
-  ...proxyOptions,
-  target: SERVICES.EVALUATION_SERVICE,
-  pathRewrite: { '^/api/evaluations': '/api/evaluations' }
-}));
+app.use('/api/evaluations', makeProxy(SERVICES.EVALUATION_SERVICE, { '^/api/evaluations': '/api/evaluations' }));
 
-app.use('/api/interviews', createProxyMiddleware({
-  ...proxyOptions,
-  target: SERVICES.EVALUATION_SERVICE,
-  pathRewrite: { '^/api/interviews': '/api/interviews' }
-}));
+app.use('/api/interviews', makeProxy(SERVICES.EVALUATION_SERVICE, { '^/api/interviews': '/api/interviews' }));
 
 // Proxy para Notification Service
-app.use('/api/notifications', createProxyMiddleware({
-  ...proxyOptions,
-  target: SERVICES.NOTIFICATION_SERVICE,
-  pathRewrite: { '^/api/notifications': '/api/notifications' }
-}));
+app.use('/api/notifications', makeProxy(SERVICES.NOTIFICATION_SERVICE, { '^/api/notifications': '/api/notifications' }));
 
 // Proxy para Dashboard Service
-app.use('/api/dashboard', createProxyMiddleware({
-  ...proxyOptions,
-  target: SERVICES.DASHBOARD_SERVICE,
-  pathRewrite: { '^/api/dashboard': '/api/dashboard' }
-}));
+app.use('/api/dashboard', makeProxy(SERVICES.DASHBOARD_SERVICE, { '^/api/dashboard': '/api/dashboard' }));
 
 // Proxy para Guardian Service
-app.use('/api/guardians', createProxyMiddleware({
-  ...proxyOptions,
-  target: SERVICES.GUARDIAN_SERVICE,
-  pathRewrite: { '^/api/guardians': '/api/guardians' }
-}));
+app.use('/api/guardians', makeProxy(SERVICES.GUARDIAN_SERVICE, { '^/api/guardians': '/api/guardians' }));
 
 // 404 handler
 app.use((req, res) => {
