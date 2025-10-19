@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies (prefer lockfile, fallback without it)
-RUN npm install --omit=dev; \
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
 # Stage 2: Production
 FROM node:18-alpine
@@ -23,11 +23,14 @@ RUN addgroup -g 1001 nodejs && \
 
 WORKDIR /app
 
+# Copy application files first
+COPY --chown=nodejs:nodejs . .
+
+# Ensure no stale node_modules from context
+RUN rm -rf node_modules
+
 # Copy dependencies from builder
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-
-# Copy application files
-COPY --chown=nodejs:nodejs . .
 
 # Create directories
 RUN mkdir -p uploads logs && \
