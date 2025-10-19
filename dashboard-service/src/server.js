@@ -9,9 +9,9 @@ let server;
 const startServer = async () => {
   try {
     // Test database connection
-    const client = await dbPool.connect();
+    /*const client = await dbPool.connect();
     logger.info('Database connection established successfully');
-    client.release();
+    client.release();*/
 
     // Start HTTP server
     server = app.listen(PORT, () => {
