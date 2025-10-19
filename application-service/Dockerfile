@@ -8,9 +8,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && \
-    npm cache clean --force
+# Install dependencies (prefer lockfile, fallback without it)
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
 # Stage 2: Production
 FROM node:18-alpine
@@ -24,11 +23,14 @@ RUN addgroup -g 1001 nodejs && \
 
 WORKDIR /app
 
+# Copy application files first
+COPY --chown=nodejs:nodejs . .
+
+# Ensure no stale node_modules from context
+RUN rm -rf node_modules
+
 # Copy dependencies from builder
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-
-# Copy application files
-COPY --chown=nodejs:nodejs . .
 
 # Create directories
 RUN mkdir -p uploads logs && \
@@ -39,10 +41,6 @@ USER nodejs
 
 # Expose port
 EXPOSE 8083
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:8083/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"
 
 # Start with dumb-init
 ENTRYPOINT ["dumb-init", "--"]
