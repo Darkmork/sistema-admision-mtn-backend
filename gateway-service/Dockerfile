@@ -1,11 +1,35 @@
-# NGINX API Gateway Docker Image
-FROM nginx:1.25-alpine
+# Express API Gateway Docker Image
+FROM node:18-alpine
 
-# Install necessary tools
+# Install curl for health checks
 RUN apk add --no-cache curl
 
-# Expose port
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install --production
+
+# Copy application code
+COPY . .
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
+
+# Switch to non-root user
+USER nodejs
+
+# Expose port (Railway will assign dynamically via $PORT)
 EXPOSE 8080
 
-# Start nginx in foreground
-CMD ["nginx", "-g", "daemon off;"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
+
+# Start application
+CMD ["node", "src/server.js"]
