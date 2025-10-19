@@ -28,7 +28,7 @@ class AuthController {
       const result = await this.authService.login(email, password);
       res.json(result);
     } catch (error) {
-      const status = error.message.includes('Credenciales') || error.message.includes('inactivo') ? 401 : 400;
+      const status = error.message.includes('Credenciales') || error.message.includes('inactivo') ? 401 : 422;
       res.status(status).json({
         success: false,
         error: error.message
@@ -44,7 +44,7 @@ class AuthController {
       const result = await this.authService.register(req.body);
       res.status(201).json(result);
     } catch (error) {
-      const status = error.message.includes('registrado') ? 409 : 400;
+      const status = error.message.includes('registrado') ? 409 : 422;
       res.status(status).json({
         success: false,
         error: error.message
@@ -71,7 +71,7 @@ class AuthController {
       const { email } = req.query;
 
       if (!email) {
-        return res.status(400).json({
+        return res.status(422).json({
           success: false,
           error: 'Email es requerido'
         });

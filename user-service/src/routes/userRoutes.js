@@ -374,7 +374,7 @@ router.get('/search', authenticateToken, async (req, res) => {
     const { query, role, activeOnly } = req.query;
 
     if (!query || query.trim() === '') {
-      return res.status(400).json({
+      return res.status(422).json({
         success: false,
         error: 'Se requiere un término de búsqueda'
       });
@@ -533,7 +533,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
       rut: user.rut,
       phone: user.phone,
       active: user.active,
-      emailVerified: user.email_verified
+      emailVerified: user.email_verified,
+      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
     });
   } catch (error) {
     res.status(500).json({
@@ -661,7 +662,7 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
     const { active } = req.body;
 
     if (typeof active !== 'boolean') {
-      return res.status(400).json({
+      return res.status(422).json({
         success: false,
         error: 'El campo "active" debe ser booleano'
       });
@@ -899,7 +900,7 @@ router.patch('/:id/preferences', authenticateToken, async (req, res) => {
     const { preferences } = req.body;
 
     if (!preferences || typeof preferences !== 'object') {
-      return res.status(400).json({
+      return res.status(422).json({
         success: false,
         error: 'Se requieren las preferencias en formato objeto'
       });
