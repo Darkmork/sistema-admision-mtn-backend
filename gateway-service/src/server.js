@@ -32,13 +32,33 @@ app.use((req, res, next) => {
 // URLs de los microservicios
 // Para Railway: usa variables de entorno que apuntan a networking privado
 // Para Local: usa localhost con los puertos correspondientes
+const getServiceUrl = (envVar, fallback) => {
+  const val = process.env[envVar];
+  // Considerar que estamos en "producción" si NODE_ENV=production o si hay indicios de despliegue en Railway
+  const isProductionLike = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_STATIC_URL || !!process.env.RAILWAY_ENV;
+
+  if (!val && isProductionLike) {
+    logger.error(`La variable de entorno ${envVar} no está definida pero es requerida en producción. Evitando uso del fallback (${fallback}).`);
+    logger.error('Por favor configura las variables de entorno del Gateway en Railway (p. ej. USER_SERVICE_URL, APPLICATION_SERVICE_URL, etc.).');
+    // Salimos con código de error para evitar que el gateway use localhost en producción
+    process.exit(1);
+  }
+
+  if (!val) {
+    logger.warn(`La variable de entorno ${envVar} no está definida. Usando fallback para desarrollo: ${fallback}`);
+    return fallback;
+  }
+
+  return val;
+};
+
 const SERVICES = {
-  USER_SERVICE: process.env.USER_SERVICE_URL || 'http://localhost:8082',
-  APPLICATION_SERVICE: process.env.APPLICATION_SERVICE_URL || 'http://localhost:8083',
-  EVALUATION_SERVICE: process.env.EVALUATION_SERVICE_URL || 'http://localhost:8084',
-  NOTIFICATION_SERVICE: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085',
-  DASHBOARD_SERVICE: process.env.DASHBOARD_SERVICE_URL || 'http://localhost:8086',
-  GUARDIAN_SERVICE: process.env.GUARDIAN_SERVICE_URL || 'http://localhost:8087'
+  USER_SERVICE: getServiceUrl('USER_SERVICE_URL', 'http://localhost:8082'),
+  APPLICATION_SERVICE: getServiceUrl('APPLICATION_SERVICE_URL', 'http://localhost:8083'),
+  EVALUATION_SERVICE: getServiceUrl('EVALUATION_SERVICE_URL', 'http://localhost:8084'),
+  NOTIFICATION_SERVICE: getServiceUrl('NOTIFICATION_SERVICE_URL', 'http://localhost:8085'),
+  DASHBOARD_SERVICE: getServiceUrl('DASHBOARD_SERVICE_URL', 'http://localhost:8086'),
+  GUARDIAN_SERVICE: getServiceUrl('GUARDIAN_SERVICE_URL', 'http://localhost:8087')
 };
 
 // Rutas públicas que NO requieren autenticación
