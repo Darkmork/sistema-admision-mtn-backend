@@ -9,11 +9,11 @@ let server;
 
 const startServer = async () => {
   try {
-    const dbConnected = await testConnection();
+    /*const dbConnected = await testConnection();
     if (!dbConnected) {
       logger.error('Failed to connect to database. Exiting...');
       process.exit(1);
-    }
+    }*/
 
     server = app.listen(PORT, () => {
       logger.info(`${SERVICE_NAME} started successfully`);
