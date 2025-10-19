@@ -29,14 +29,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// URLs de los microservicios (Railway URLs)
+// URLs de los microservicios
+// Para Railway: usa variables de entorno que apuntan a networking privado
+// Para Local: usa localhost con los puertos correspondientes
 const SERVICES = {
-  USER_SERVICE: process.env.USER_SERVICE_URL || 'https://user-service-production-93ae.up.railway.app',
-  APPLICATION_SERVICE: process.env.APPLICATION_SERVICE_URL || 'https://application-service-production.up.railway.app',
-  EVALUATION_SERVICE: process.env.EVALUATION_SERVICE_URL || 'https://evaluation-service-production.up.railway.app',
-  NOTIFICATION_SERVICE: process.env.NOTIFICATION_SERVICE_URL || 'https://notification-service-production-78a5.up.railway.app',
-  DASHBOARD_SERVICE: process.env.DASHBOARD_SERVICE_URL || 'https://dashboard-service-production-3535.up.railway.app',
-  GUARDIAN_SERVICE: process.env.GUARDIAN_SERVICE_URL || 'https://guardian-service-production.up.railway.app'
+  USER_SERVICE: process.env.USER_SERVICE_URL || 'http://localhost:8082',
+  APPLICATION_SERVICE: process.env.APPLICATION_SERVICE_URL || 'http://localhost:8083',
+  EVALUATION_SERVICE: process.env.EVALUATION_SERVICE_URL || 'http://localhost:8084',
+  NOTIFICATION_SERVICE: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085',
+  DASHBOARD_SERVICE: process.env.DASHBOARD_SERVICE_URL || 'http://localhost:8086',
+  GUARDIAN_SERVICE: process.env.GUARDIAN_SERVICE_URL || 'http://localhost:8087'
 };
 
 // Rutas públicas que NO requieren autenticación
