@@ -40,15 +40,15 @@ const SERVICES = {
 };
 
 // Rutas públicas que NO requieren autenticación
+// IMPORTANTE: Como el middleware se aplica en /api, los paths aquí NO deben incluir /api
+// Los endpoints /health de los microservicios SÍ requieren autenticación por seguridad
 const PUBLIC_ROUTES = [
-  '/api/auth/login',
-  '/api/auth/register',
-  '/api/auth/verify-email',
-  '/api/applications/public/all',
-  '/api/applications/stats',
-  '/api/applications/statistics',
-  '/health',
-  '/gateway/status'
+  '/auth/login',
+  '/auth/register',
+  '/auth/verify-email',
+  '/applications/public/all',
+  '/applications/stats',
+  '/applications/statistics'
 ];
 
 // Middleware de autenticación JWT centralizado
