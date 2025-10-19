@@ -11,13 +11,13 @@ services:
       - "8080:8080"
     networks:
       - mtn-network
-    depends_on:
-      - user-service
-      - application-service
-      - evaluation-service
-      - notification-service
-      - dashboard-service
-      - guardian-service
+#    depends_on:
+#      - user-service
+#      - application-service
+#      - evaluation-service
+#      - notification-service
+#      - dashboard-service
+#      - guardian-service
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/gateway/status"]
       interval: 30s
