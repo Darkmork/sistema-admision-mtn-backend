@@ -9,8 +9,6 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
-    networks:
-      - mtn-network
 #    depends_on:
 #      - user-service
 #      - application-service
@@ -18,12 +16,6 @@ services:
 #      - notification-service
 #      - dashboard-service
 #      - guardian-service
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/gateway/status"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
     volumes:
       - ./logs:/var/log/nginx
     environment:
@@ -115,9 +107,6 @@ services:
 #      timeout: 5s
 #      retries: 5
 
-networks:
-  mtn-network:
-    driver: bridge
 
 volumes:
   postgres-data:
