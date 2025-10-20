@@ -1,0 +1,228 @@
+{
+  "metadata": {
+    "generatedAt": "2025-10-18T00:00:00.000Z",
+    "totalEndpoints": 92,
+    "services": 6,
+    "backend": "/Users/jorgegangale/Desktop/MIcroservicios",
+    "gateway": "NGINX on port 8080"
+  },
+  "services": [
+    {
+      "name": "user-service",
+      "port": 8082,
+      "file": "user-service/src/routes/userRoutes.js",
+      "endpoints": [
+        { "method": "GET", "path": "/api/users/roles", "auth": false, "response": "{ roles }", "description": "Get all roles" },
+        { "method": "GET", "path": "/api/users/public/school-staff", "auth": false, "query": ["activeOnly"], "response": "{ success, data, count }", "description": "Get school staff users (public)" },
+        { "method": "GET", "path": "/api/users/me", "auth": true, "response": "{ success, user }", "description": "Get current user profile" },
+        { "method": "GET", "path": "/api/users/stats", "auth": true, "response": "{ success, data: { total, active, inactive, byRole } }", "description": "Get user statistics" },
+        { "method": "GET", "path": "/api/users/statistics", "auth": true, "deprecated": true, "response": "{ success, data }", "description": "Get user statistics (DEPRECATED, use /stats)" },
+        { "method": "GET", "path": "/api/users/by-role/:role", "auth": true, "query": ["activeOnly"], "response": "{ success, data, count, role }", "description": "Get users by role" },
+        { "method": "GET", "path": "/api/users/evaluators", "auth": true, "query": ["subject", "educationalLevel", "activeOnly"], "response": "{ success, data, count }", "description": "Get all evaluators" },
+        { "method": "GET", "path": "/api/users/staff", "auth": true, "query": ["page", "size", "search", "role", "active"], "response": "PagedResponse", "description": "Get staff users with pagination" },
+        { "method": "GET", "path": "/api/users/search", "auth": true, "query": ["query", "role", "activeOnly"], "response": "{ success, data, count, query }", "description": "Search users" },
+        { "method": "GET", "path": "/api/users", "auth": true, "response": "{ success, data, users, count }", "description": "Get all users" },
+        { "method": "GET", "path": "/api/users/:id/associated-data", "auth": true, "response": "{ success, data: { evaluations, interviews, schedules } }", "description": "Get user's associated data count" },
+        { "method": "GET", "path": "/api/users/:id", "auth": true, "response": "User object", "description": "Get user by ID" },
+        { "method": "POST", "path": "/api/users", "auth": true, "body": ["firstName", "lastName", "email", "password", "role", "rut", "phone", "subject"], "response": "{ success, message, data }", "statusCode": 201, "description": "Create new user" },
+        { "method": "PUT", "path": "/api/users/:id", "auth": true, "body": ["firstName", "lastName", "email", "password?", "role", "active", "rut", "phone", "subject"], "response": "{ success, message }", "description": "Update user" },
+        { "method": "DELETE", "path": "/api/users/:id", "auth": true, "response": "{ success, message }", "description": "Delete user" },
+        { "method": "PATCH", "path": "/api/users/:id/status", "auth": true, "body": ["active"], "response": "{ success, message, data }", "description": "Toggle user active status" },
+        { "method": "PUT", "path": "/api/users/:id/activate", "auth": true, "response": "{ success, message, data }", "description": "Activate user" },
+        { "method": "PUT", "path": "/api/users/:id/deactivate", "auth": true, "response": "{ success, message, data }", "description": "Deactivate user" },
+        { "method": "PUT", "path": "/api/users/:id/reset-password", "auth": true, "response": "{ success, message, data: { temporaryPassword } }", "description": "Reset user password (admin)" },
+        { "method": "POST", "path": "/api/users/:id/reset-password", "auth": true, "deprecated": true, "response": "{ success, message, data }", "description": "Reset password (DEPRECATED, use PUT)" },
+        { "method": "POST", "path": "/api/users/:id/verify-email", "auth": true, "response": "{ success, message, data }", "description": "Verify user email" },
+        { "method": "PATCH", "path": "/api/users/:id/preferences", "auth": true, "body": ["preferences"], "response": "{ success, message, data }", "description": "Update user preferences" }
+      ]
+    },
+    {
+      "name": "application-service",
+      "port": 8083,
+      "file": "application-service/src/routes/applicationRoutes.js",
+      "endpoints": [
+        { "method": "GET", "path": "/api/applications/stats", "auth": false, "response": "Statistics", "description": "Get application statistics" },
+        { "method": "GET", "path": "/api/applications/public/all", "auth": false, "query": ["page", "limit"], "response": "{ success, data, pagination }", "description": "Get all applications (public)" },
+        { "method": "GET", "path": "/api/applications/statistics", "auth": true, "response": "Statistics", "description": "Get application statistics (alias)" },
+        { "method": "GET", "path": "/api/applications/recent", "auth": true, "query": ["limit"], "response": "{ success, data, count }", "description": "Get recent applications" },
+        { "method": "GET", "path": "/api/applications/requiring-documents", "auth": true, "response": "{ success, data, count }", "description": "Get applications requiring documents" },
+        { "method": "GET", "path": "/api/applications/search", "auth": true, "query": ["query", "status"], "response": "{ success, data, count, query }", "description": "Search applications" },
+        { "method": "GET", "path": "/api/applications/export", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "query": ["status", "format"], "response": "JSON or CSV", "description": "Export applications" },
+        { "method": "GET", "path": "/api/applications/status/:status", "auth": true, "query": ["page", "limit"], "response": "{ success, data, pagination }", "description": "Filter by status" },
+        { "method": "GET", "path": "/api/applications/user/:userId", "auth": true, "response": "{ success, data, count }", "description": "Get applications by user" },
+        { "method": "GET", "path": "/api/applications/for-evaluation/:evaluatorId", "auth": true, "response": "{ success, data, count }", "description": "Get applications for evaluator" },
+        { "method": "GET", "path": "/api/applications/special-category/:category", "auth": true, "response": "{ success, data, count, category, message }", "note": "Not implemented - schema update required", "description": "Filter by special category" },
+        { "method": "POST", "path": "/api/applications/bulk/update-status", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "body": ["applicationIds", "status", "notes"], "response": "{ success, message, data }", "description": "Bulk update status" },
+        { "method": "GET", "path": "/api/applications", "auth": true, "response": "Applications array", "description": "Get all applications" },
+        { "method": "GET", "path": "/api/applications/:id/status-history", "auth": true, "response": "Status history", "description": "Get status history" },
+        { "method": "GET", "path": "/api/applications/:id/complementary-form", "auth": true, "response": "Form data (snake_case)", "note": "Returns snake_case field names", "description": "Get complementary form" },
+        { "method": "POST", "path": "/api/applications/:id/complementary-form", "auth": true, "response": "{ success, data }", "description": "Save complementary form" },
+        { "method": "GET", "path": "/api/applications/:id", "auth": true, "response": "Application object", "description": "Get application by ID" },
+        { "method": "POST", "path": "/api/applications", "auth": true, "validation": "createApplicationSchema", "response": "{ success, data }", "statusCode": 201, "description": "Create application" },
+        { "method": "PUT", "path": "/api/applications/:id", "auth": true, "validation": "updateApplicationSchema", "response": "{ success, data }", "description": "Update application" },
+        { "method": "PATCH", "path": "/api/applications/:id/status", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "validation": "updateStatusSchema", "body": ["status", "notes"], "response": "{ success, data }", "description": "Update application status" },
+        { "method": "PUT", "path": "/api/applications/:id/archive", "auth": true, "roles": ["ADMIN"], "response": "{ success }", "description": "Archive application" },
+        { "method": "DELETE", "path": "/api/applications/:id", "auth": true, "roles": ["ADMIN"], "response": "{ success, message, data }", "description": "Delete application" }
+      ]
+    },
+    {
+      "name": "evaluation-service",
+      "port": 8084,
+      "file": "evaluation-service/src/routes/evaluationRoutes.js",
+      "endpoints": [
+        { "method": "GET", "path": "/api/evaluations", "auth": true, "response": "{ success, data }", "description": "Get all evaluations" },
+        { "method": "GET", "path": "/api/evaluations/statistics", "auth": true, "response": "{ success, data: { total, byStatus, byType, averageScore } }", "description": "Get evaluation statistics" },
+        { "method": "GET", "path": "/api/evaluations/assignments", "auth": true, "response": "{ success, data, count }", "description": "Get all assignments" },
+        { "method": "GET", "path": "/api/evaluations/export", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "query": ["status", "type", "format"], "response": "JSON or CSV", "description": "Export evaluations" },
+        { "method": "GET", "path": "/api/evaluations/application/:applicationId", "auth": true, "response": "Evaluations array", "description": "Get by application" },
+        { "method": "GET", "path": "/api/evaluations/evaluator/:evaluatorId", "auth": true, "response": "{ success, data, count }", "description": "Get by evaluator" },
+        { "method": "GET", "path": "/api/evaluations/evaluator/:id/pending", "auth": true, "response": "{ success, data, count }", "description": "Get pending evaluations for evaluator" },
+        { "method": "GET", "path": "/api/evaluations/evaluator/:id/completed", "auth": true, "response": "{ success, data, count }", "description": "Get completed evaluations for evaluator" },
+        { "method": "GET", "path": "/api/evaluations/type/:type", "auth": true, "response": "{ success, data, count }", "description": "Filter by type" },
+        { "method": "GET", "path": "/api/evaluations/subject/:subject", "auth": true, "response": "{ success, data, count, subject }", "description": "Filter by subject" },
+        { "method": "GET", "path": "/api/evaluations/:id", "auth": true, "response": "{ success, data }", "description": "Get evaluation by ID" },
+        { "method": "POST", "path": "/api/evaluations", "auth": true, "roles": ["ADMIN", "TEACHER", "PSYCHOLOGIST", "CYCLE_DIRECTOR"], "validation": "createEvaluationSchema", "response": "{ success, data }", "statusCode": 201, "description": "Create evaluation" },
+        { "method": "PUT", "path": "/api/evaluations/:id", "auth": true, "roles": ["ADMIN", "TEACHER", "PSYCHOLOGIST", "CYCLE_DIRECTOR"], "validation": "updateEvaluationSchema", "response": "{ success, data }", "description": "Update evaluation" },
+        { "method": "DELETE", "path": "/api/evaluations/:id", "auth": true, "roles": ["ADMIN"], "response": "{ success }", "description": "Delete evaluation" },
+        { "method": "POST", "path": "/api/evaluations/:id/complete", "auth": true, "roles": ["ADMIN", "TEACHER", "PSYCHOLOGIST", "CYCLE_DIRECTOR"], "body": ["score", "recommendations", "observations"], "response": "{ success, message, data }", "description": "Mark evaluation as complete" },
+        { "method": "POST", "path": "/api/evaluations/:id/assign", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "body": ["evaluatorId", "evaluationDate"], "response": "{ success, message, data }", "description": "Assign evaluation to evaluator" },
+        { "method": "POST", "path": "/api/evaluations/:id/reschedule", "auth": true, "roles": ["ADMIN", "COORDINATOR", "TEACHER", "PSYCHOLOGIST"], "body": ["evaluationDate"], "response": "{ success, message, data }", "description": "Reschedule evaluation" },
+        { "method": "POST", "path": "/api/evaluations/:id/cancel", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "body": ["reason"], "response": "{ success, message, data }", "description": "Cancel evaluation" },
+        { "method": "POST", "path": "/api/evaluations/bulk/assign", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "body": ["evaluationIds", "evaluatorId", "evaluationDate"], "response": "{ success, message, data }", "description": "Bulk assign evaluations" }
+      ]
+    },
+    {
+      "name": "evaluation-service (interviews)",
+      "port": 8084,
+      "file": "evaluation-service/src/routes/interviewRoutes.js",
+      "note": "Interview routes are served by evaluation-service",
+      "endpoints": [
+        { "method": "GET", "path": "/api/interviews", "auth": true, "query": ["page", "size", "status", "evaluatorId"], "response": "Paginated interviews", "description": "Get all interviews" },
+        { "method": "GET", "path": "/api/interviews/:id", "auth": true, "response": "Interview object", "description": "Get interview by ID" },
+        { "method": "POST", "path": "/api/interviews", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "response": "{ success, data }", "statusCode": 201, "description": "Create interview" },
+        { "method": "PUT", "path": "/api/interviews/:id", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "response": "{ success, data }", "description": "Update interview" },
+        { "method": "DELETE", "path": "/api/interviews/:id", "auth": true, "roles": ["ADMIN"], "response": "{ success }", "description": "Delete interview" },
+        { "method": "PATCH", "path": "/api/interviews/:id/status", "auth": true, "body": ["status"], "response": "{ success, data }", "description": "Update interview status" },
+        { "method": "POST", "path": "/api/interviews/:id/reschedule", "auth": true, "body": ["scheduledDate", "scheduledTime", "reason"], "response": "{ success, data }", "description": "Reschedule interview" }
+      ]
+    },
+    {
+      "name": "evaluation-service (schedules)",
+      "port": 8084,
+      "file": "evaluation-service/src/routes/interviewerScheduleRoutes.js",
+      "note": "Schedule routes for evaluation and interview scheduling",
+      "endpoints": [
+        { "method": "GET", "path": "/api/interviewer-schedules", "auth": true, "query": ["interviewerId", "date", "available"], "response": "{ success, data }", "description": "Get interviewer schedules" },
+        { "method": "GET", "path": "/api/interviewer-schedules/:id", "auth": true, "response": "{ success, data }", "description": "Get schedule by ID" },
+        { "method": "POST", "path": "/api/interviewer-schedules", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "response": "{ success, data }", "statusCode": 201, "description": "Create schedule" },
+        { "method": "PUT", "path": "/api/interviewer-schedules/:id", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "response": "{ success, data }", "description": "Update schedule" },
+        { "method": "DELETE", "path": "/api/interviewer-schedules/:id", "auth": true, "roles": ["ADMIN"], "response": "{ success }", "description": "Delete schedule" },
+        { "method": "POST", "path": "/api/interviewer-schedules/bulk", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "body": ["schedules"], "response": "{ success, data }", "description": "Bulk create schedules" }
+      ]
+    },
+    {
+      "name": "dashboard-service",
+      "port": 8086,
+      "file": "dashboard-service/src/routes/dashboardRoutes.js",
+      "endpoints": [
+        { "method": "GET", "path": "/api/dashboard/admin/detailed-stats", "auth": true, "query": ["academicYear"], "response": "{ success, data: { academicYear, availableYears, weeklyInterviews, pendingEvaluations, monthlyTrends, statusBreakdown }, timestamp }", "description": "Get detailed admin dashboard statistics" },
+        { "method": "GET", "path": "/api/dashboard/stats", "auth": true, "response": "Dashboard statistics", "description": "Get dashboard statistics" },
+        { "method": "GET", "path": "/api/analytics/*", "auth": true, "note": "Analytics endpoints served through dashboard-service", "description": "Analytics endpoints" }
+      ]
+    },
+    {
+      "name": "notification-service",
+      "port": 8085,
+      "file": "notification-service/src/routes/notificationRoutes.js",
+      "endpoints": [
+        { "method": "GET", "path": "/api/notifications", "auth": true, "response": "{ success, data }", "description": "Get user notifications" },
+        { "method": "POST", "path": "/api/notifications", "auth": true, "response": "{ success, data }", "statusCode": 201, "description": "Create notification" },
+        { "method": "PATCH", "path": "/api/notifications/:id/read", "auth": true, "response": "{ success }", "description": "Mark notification as read" },
+        { "method": "POST", "path": "/api/email/send", "auth": true, "roles": ["ADMIN", "COORDINATOR"], "body": ["to", "subject", "body"], "response": "{ success, data }", "description": "Send email" },
+        { "method": "GET", "path": "/api/email/templates", "auth": true, "response": "{ success, data }", "description": "Get email templates" }
+      ]
+    },
+    {
+      "name": "guardian-service",
+      "port": 8087,
+      "file": "guardian-service/src/routes/guardianRoutes.js",
+      "note": "Guardian service delegates most operations to user-service",
+      "endpoints": [
+        { "method": "GET", "path": "/api/guardians", "auth": true, "query": ["page", "size", "search", "active"], "response": "PagedResponse<Guardian>", "note": "Filters role=APODERADO", "description": "Get paginated guardians" },
+        { "method": "GET", "path": "/api/guardians/:id", "auth": true, "response": "Guardian object", "description": "Get guardian by ID" },
+        { "method": "POST", "path": "/api/guardians", "auth": true, "validation": "role must be APODERADO", "response": "{ success, data }", "statusCode": 201, "description": "Create guardian" },
+        { "method": "PUT", "path": "/api/guardians/:id", "auth": true, "response": "{ success, data }", "description": "Update guardian" },
+        { "method": "DELETE", "path": "/api/guardians/:id", "auth": true, "response": "{ success }", "description": "Delete guardian" }
+      ]
+    }
+  ],
+  "gateway": {
+    "type": "NGINX",
+    "port": 8080,
+    "file": "gateway-service/config/nginx.conf",
+    "routes": [
+      { "path": "/api/auth", "upstream": "user-service:8082", "description": "Authentication endpoints" },
+      { "path": "/api/users", "upstream": "user-service:8082", "description": "User management endpoints" },
+      { "path": "/api/applications", "upstream": "application-service:8083", "rateLimit": "20 req/s per IP", "description": "Application endpoints" },
+      { "path": "/api/documents", "upstream": "application-service:8083", "clientMaxBodySize": "50M", "timeout": "30s", "description": "Document upload endpoints" },
+      { "path": "/api/evaluations", "upstream": "evaluation-service:8084", "description": "Evaluation endpoints" },
+      { "path": "/api/interviews", "upstream": "evaluation-service:8084", "description": "Interview endpoints" },
+      { "path": "/api/interviewer-schedules", "upstream": "evaluation-service:8084", "description": "Schedule endpoints" },
+      { "path": "/api/notifications", "upstream": "notification-service:8085", "description": "Notification endpoints" },
+      { "path": "/api/email", "upstream": "notification-service:8085", "description": "Email endpoints" },
+      { "path": "/api/dashboard", "upstream": "dashboard-service:8086", "description": "Dashboard endpoints" },
+      { "path": "/api/analytics", "upstream": "dashboard-service:8086", "timeout": "15s", "description": "Analytics endpoints" },
+      { "path": "/api/guardians", "upstream": "guardian-service:8087", "description": "Guardian management endpoints" }
+    ],
+    "features": {
+      "cors": {
+        "allowedOrigins": "http://localhost:5173-5179, 3000, 4200",
+        "allowedMethods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+        "allowCredentials": true,
+        "maxAge": 3600
+      },
+      "rateLimiting": {
+        "byIP": "20 req/s",
+        "byToken": "100 req/s",
+        "connectionLimit": "10 per IP"
+      },
+      "circuitBreaker": {
+        "maxFails": 2,
+        "failTimeout": "10s"
+      },
+      "keepAlive": {
+        "connections": 32,
+        "requests": 100,
+        "timeout": "60s"
+      },
+      "timeouts": {
+        "connect": "3s",
+        "send": "10s",
+        "read": "8s"
+      }
+    }
+  },
+  "summary": {
+    "totalEndpoints": 92,
+    "byService": {
+      "user-service": 22,
+      "application-service": 22,
+      "evaluation-service": 19,
+      "evaluation-service (interviews)": 7,
+      "evaluation-service (schedules)": 6,
+      "dashboard-service": 3,
+      "notification-service": 5,
+      "guardian-service": 5
+    },
+    "byMethod": {
+      "GET": 50,
+      "POST": 23,
+      "PUT": 11,
+      "PATCH": 5,
+      "DELETE": 8
+    },
+    "requiresAuth": 87,
+    "publicEndpoints": 5,
+    "deprecatedEndpoints": 2
+  }
+}

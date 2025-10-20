@@ -1,0 +1,160 @@
+{
+  "metadata": {
+    "generatedAt": "2025-10-18T00:00:00.000Z",
+    "totalEndpoints": 87,
+    "services": 7,
+    "frontend": "/Users/jorgegangale/Library/Mobile Documents/com~apple~CloudDocs/Proyectos/Admision_MTN/Admision_MTN_front"
+  },
+  "endpoints": [
+    {
+      "service": "apiClient",
+      "file": "services/apiClient.ts",
+      "endpoints": [
+        { "method": "GET", "path": "/api/auth/check", "function": "checkAuth", "auth": false, "description": "Verify authentication status" },
+        { "method": "GET", "path": "/api/auth/me", "function": "getCurrentUser", "auth": true, "description": "Get current user profile" },
+        { "method": "GET", "path": "/api/users", "function": "getUsers", "auth": true, "query": ["page", "size", "sort", "direction"], "description": "Get paginated users" },
+        { "method": "GET", "path": "/api/users/:id", "function": "getUserById", "auth": true, "description": "Get user by ID" },
+        { "method": "POST", "path": "/api/users", "function": "createUser", "auth": true, "description": "Create new user" },
+        { "method": "PUT", "path": "/api/users/:id", "function": "updateUser", "auth": true, "description": "Update user" },
+        { "method": "DELETE", "path": "/api/users/:id", "function": "deleteUser", "auth": true, "description": "Delete user" },
+        { "method": "GET", "path": "/api/applications", "function": "getApplications", "auth": true, "query": ["page", "size", "sort", "direction", "status"], "description": "Get paginated applications" },
+        { "method": "GET", "path": "/api/applications/:id", "function": "getApplicationById", "auth": true, "description": "Get application by ID" },
+        { "method": "POST", "path": "/api/applications", "function": "createApplication", "auth": true, "description": "Create new application" },
+        { "method": "PUT", "path": "/api/applications/:id", "function": "updateApplication", "auth": true, "description": "Update application" },
+        { "method": "PATCH", "path": "/api/applications/:id/status", "function": "changeApplicationStatus", "auth": true, "body": ["status", "reason"], "description": "Change application status" },
+        { "method": "PUT", "path": "/api/applications/:id/archive", "function": "archiveApplication", "auth": true, "description": "Archive application" },
+        { "method": "GET", "path": "/api/evaluations", "function": "getEvaluations", "auth": true, "query": ["page", "size", "sort", "direction"], "description": "Get paginated evaluations" },
+        { "method": "POST", "path": "/api/evaluations", "function": "createEvaluation", "auth": true, "description": "Create evaluation" },
+        { "method": "PUT", "path": "/api/evaluations/:id", "function": "updateEvaluation", "auth": true, "description": "Update evaluation" },
+        { "method": "GET", "path": "/api/interviews", "function": "getInterviews", "auth": true, "query": ["page", "size", "sort", "direction"], "description": "Get paginated interviews" },
+        { "method": "POST", "path": "/api/interviews", "function": "scheduleInterview", "auth": true, "description": "Schedule interview" },
+        { "method": "PUT", "path": "/api/interviews/:id", "function": "updateInterview", "auth": true, "description": "Update interview" },
+        { "method": "POST", "path": "/api/files/upload", "function": "uploadFile", "auth": true, "contentType": "multipart/form-data", "description": "Upload file" },
+        { "method": "GET", "path": "/api/files/:id/download", "function": "downloadFile", "auth": true, "responseType": "blob", "description": "Download file" },
+        { "method": "GET", "path": "/api/dashboard/stats", "function": "getDashboardStats", "auth": true, "description": "Get dashboard statistics" },
+        { "method": "GET", "path": "/api/dashboard/users/stats", "function": "getUserStats", "auth": true, "description": "Get user statistics" },
+        { "method": "GET", "path": "/api/dashboard/applications/stats", "function": "getApplicationStats", "auth": true, "description": "Get application statistics" },
+        { "method": "POST", "path": "/api/utils/validate-rut", "function": "validateRut", "auth": true, "body": ["rut"], "description": "Validate Chilean RUT" },
+        { "method": "GET", "path": "/actuator/info", "function": "getSystemInfo", "auth": false, "description": "Get system information" }
+      ]
+    },
+    {
+      "service": "userService",
+      "file": "services/userService.ts",
+      "endpoints": [
+        { "method": "GET", "path": "/api/users", "function": "getAllUsers", "auth": true, "query": ["search", "role", "active", "page", "size", "sort"], "responseAdapter": "DataAdapter.adaptUserApiResponse", "description": "Get all users with filters" },
+        { "method": "GET", "path": "/api/users/:id", "function": "getUserById", "auth": true, "description": "Get user by ID" },
+        { "method": "POST", "path": "/api/users", "function": "createUser", "auth": true, "body": ["firstName", "lastName", "email", "password", "role", "rut", "phone", "subject"], "description": "Create new user" },
+        { "method": "PUT", "path": "/api/users/:id", "function": "updateUser", "auth": true, "body": ["firstName", "lastName", "email", "role", "rut", "phone", "subject"], "description": "Update user" },
+        { "method": "PUT", "path": "/api/users/:id/deactivate", "function": "deactivateUser", "auth": true, "description": "Deactivate user" },
+        { "method": "DELETE", "path": "/api/users/:id", "function": "deleteUser", "auth": true, "description": "Delete user permanently" },
+        { "method": "PUT", "path": "/api/users/:id/activate", "function": "activateUser", "auth": true, "description": "Activate user" },
+        { "method": "PUT", "path": "/api/users/:id/reset-password", "function": "resetUserPassword", "auth": true, "description": "Reset user password" },
+        { "method": "GET", "path": "/api/users/roles", "function": "getAllRoles", "auth": true, "fallback": "Local enum", "description": "Get all roles" },
+        { "method": "GET", "path": "/api/users/stats", "function": "getUserStats", "auth": true, "description": "Get user statistics" },
+        { "method": "GET", "path": "/api/users", "function": "getSchoolStaffUsers", "auth": true, "query": ["excludeRole=APODERADO"], "responseAdapter": "DataAdapter.adaptUserApiResponse", "description": "Get school staff users (excluding guardians)" },
+        { "method": "GET", "path": "/api/users/public/school-staff", "function": "getSchoolStaffUsersPublic", "auth": false, "description": "Get school staff users (public endpoint)" }
+      ]
+    },
+    {
+      "service": "applicationService",
+      "file": "services/applicationService.ts",
+      "endpoints": [
+        { "method": "GET", "path": "/api/applications", "function": "getAllApplications", "auth": true, "fallback": "/api/applications/public/all", "description": "Get all applications (admin)" },
+        { "method": "GET", "path": "/api/applications/my-applications", "function": "getMyApplications", "auth": true, "description": "Get user's applications" },
+        { "method": "GET", "path": "/api/applications/:id", "function": "getApplicationById", "auth": true, "description": "Get application by ID" },
+        { "method": "POST", "path": "/api/applications", "function": "createApplication", "auth": true, "body": ["firstName", "paternalLastName", "maternalLastName", "rut", "birthDate", "grade", "schoolApplied", "parent1Name", "parent1Rut", "parent2Name", "parent2Rut", "supporterName", "supporterRut", "guardianName", "guardianRut"], "description": "Create application" },
+        { "method": "PUT", "path": "/api/applications/:id/archive", "function": "archiveApplication", "auth": true, "description": "Archive application (admin)" },
+        { "method": "PATCH", "path": "/api/applications/:id/status", "function": "updateApplicationStatus", "auth": true, "body": ["status", "notes"], "description": "Update application status (admin)" },
+        { "method": "GET", "path": "/api/applications/:id/status-history", "function": "getApplicationStatusHistory", "auth": true, "description": "Get status change history" },
+        { "method": "POST", "path": "/api/applications", "function": "submitApplication", "auth": true, "description": "Submit application" },
+        { "method": "PUT", "path": "/api/applications/:id", "function": "updateApplication", "auth": true, "description": "Update application" },
+        { "method": "POST", "path": "/api/applications/documents", "function": "uploadDocument", "auth": true, "contentType": "multipart/form-data", "body": ["file", "documentType", "applicationId"], "description": "Upload document" },
+        { "method": "GET", "path": "/api/applications/:id/documents", "function": "getApplicationDocuments", "auth": true, "description": "Get application documents" },
+        { "method": "PUT", "path": "/api/applications/documents/:id/approval", "function": "updateDocumentApprovalStatus", "auth": true, "body": ["approvalStatus"], "description": "Update document approval status", "status": "NEEDS VERIFICATION" },
+        { "method": "GET", "path": "/api/applications/:id/complementary-form", "function": "getComplementaryForm", "auth": true, "responseAdapter": "snake_case to camelCase", "description": "Get complementary form" },
+        { "method": "POST", "path": "/api/applications/:id/complementary-form", "function": "saveComplementaryForm", "auth": true, "description": "Save complementary form" }
+      ]
+    },
+    {
+      "service": "evaluationService",
+      "file": "services/evaluationService.ts",
+      "endpoints": [
+        { "method": "POST", "path": "/api/schedules/generic", "function": "createGenericSchedule", "auth": true, "roles": ["ADMIN"], "description": "Create generic schedule" },
+        { "method": "POST", "path": "/api/schedules/individual", "function": "createIndividualSchedule", "auth": true, "description": "Create individual schedule" },
+        { "method": "GET", "path": "/api/schedules/family/:applicationId", "function": "getFamilySchedules", "auth": true, "description": "Get family schedules" },
+        { "method": "GET", "path": "/api/schedules/evaluator/:evaluatorId", "function": "getEvaluatorSchedule", "auth": true, "query": ["startDate", "endDate"], "description": "Get evaluator calendar" },
+        { "method": "PUT", "path": "/api/schedules/:scheduleId/confirm", "function": "confirmSchedule", "auth": true, "query": ["userId"], "description": "Confirm schedule" },
+        { "method": "PUT", "path": "/api/schedules/:scheduleId/reschedule", "function": "rescheduleAppointment", "auth": true, "body": ["newDate", "reason"], "description": "Reschedule appointment" },
+        { "method": "GET", "path": "/api/schedules/pending-confirmations", "function": "getPendingConfirmations", "auth": true, "description": "Get pending confirmations" },
+        { "method": "PUT", "path": "/api/schedules/:scheduleId/complete", "function": "markAsCompleted", "auth": true, "description": "Mark schedule as completed" },
+        { "method": "GET", "path": "/api/schedules/public/mock-schedules/:applicationId", "function": "getMockFamilySchedules", "auth": false, "description": "Get mock schedules (dev only)" },
+        { "method": "POST", "path": "/api/evaluations/assign/:applicationId", "function": "assignEvaluationsToApplication", "auth": true, "description": "Auto-assign evaluations" },
+        { "method": "POST", "path": "/api/evaluations/assign/:applicationId/:evaluationType/:evaluatorId", "function": "assignSpecificEvaluation", "auth": true, "description": "Assign specific evaluation" },
+        { "method": "GET", "path": "/api/evaluations/application/:applicationId", "function": "getEvaluationsByApplication", "auth": true, "description": "Get evaluations by application" },
+        { "method": "GET", "path": "/api/evaluations/application/:applicationId/progress", "function": "getEvaluationProgress", "auth": true, "description": "Get evaluation progress" },
+        { "method": "GET", "path": "/api/evaluations/evaluators/:role", "function": "getEvaluatorsByRole", "auth": true, "fallback": "public endpoint", "description": "Get evaluators by role" },
+        { "method": "GET", "path": "/evaluations/my-evaluations", "function": "getMyEvaluations", "auth": true, "description": "Get my evaluations" },
+        { "method": "GET", "path": "/evaluations/my-pending", "function": "getMyPendingEvaluations", "auth": true, "description": "Get my pending evaluations" },
+        { "method": "PUT", "path": "/evaluations/:evaluationId", "function": "updateEvaluation", "auth": true, "description": "Update evaluation" },
+        { "method": "POST", "path": "/evaluations/assign/bulk", "function": "assignBulkEvaluations", "auth": true, "fallback": "public endpoint", "description": "Bulk assign evaluations" },
+        { "method": "PUT", "path": "/evaluations/:evaluationId/reassign/:newEvaluatorId", "function": "reassignEvaluation", "auth": true, "description": "Reassign evaluation" },
+        { "method": "GET", "path": "/evaluations/statistics", "function": "getEvaluationStatistics", "auth": true, "fallback": "public endpoint", "description": "Get evaluation statistics" },
+        { "method": "GET", "path": "/evaluations/application/:applicationId/detailed", "function": "getDetailedEvaluationsByApplication", "auth": true, "description": "Get detailed evaluations" },
+        { "method": "GET", "path": "/api/evaluations", "function": "getAllEvaluations", "auth": true, "description": "Get all evaluations (admin)" },
+        { "method": "GET", "path": "/api/evaluations/:evaluationId", "function": "getEvaluationById", "auth": true, "description": "Get evaluation by ID" },
+        { "method": "GET", "path": "/api/evaluations/application/:applicationId", "function": "getEvaluationsByApplicationId", "auth": true, "description": "Get evaluations by application ID" }
+      ]
+    },
+    {
+      "service": "guardianService",
+      "file": "services/guardianService.ts",
+      "endpoints": [
+        { "method": "GET", "path": "/api/users/guardians", "function": "getGuardianUsers", "auth": true, "query": ["page", "size", "search", "active"], "description": "Get paginated guardians" },
+        { "method": "GET", "path": "/api/users/:id", "function": "getGuardianUserById", "auth": true, "description": "Get guardian by ID" },
+        { "method": "POST", "path": "/api/users", "function": "createGuardianUser", "auth": true, "validation": "role must be APODERADO", "description": "Create guardian" },
+        { "method": "PUT", "path": "/api/users/:id", "function": "updateGuardianUser", "auth": true, "description": "Update guardian" },
+        { "method": "DELETE", "path": "/api/users/:id", "function": "deleteGuardianUser", "auth": true, "description": "Delete guardian" },
+        { "method": "PUT", "path": "/api/users/:id/activate", "function": "activateGuardianUser", "auth": true, "description": "Activate guardian" },
+        { "method": "PUT", "path": "/api/users/:id/deactivate", "function": "deactivateGuardianUser", "auth": true, "description": "Deactivate guardian" },
+        { "method": "PUT", "path": "/api/users/:id/reset-password", "function": "resetGuardianPassword", "auth": true, "description": "Reset guardian password" },
+        { "method": "GET", "path": "/api/users/stats", "function": "getGuardianStats", "auth": true, "description": "Get guardian statistics" }
+      ]
+    },
+    {
+      "service": "dashboardService",
+      "file": "services/dashboardService.ts",
+      "endpoints": [
+        { "method": "GET", "path": "/api/dashboard/admin/detailed-stats", "function": "getDetailedStats", "auth": true, "query": ["academicYear"], "description": "Get detailed dashboard statistics" }
+      ]
+    },
+    {
+      "service": "notificationService",
+      "file": "services/notificationService.ts",
+      "description": "Client-side only service using browser Notification API and localStorage",
+      "endpoints": [],
+      "note": "No backend API calls - all notifications are handled client-side"
+    }
+  ],
+  "summary": {
+    "totalEndpoints": 87,
+    "byService": {
+      "apiClient": 26,
+      "userService": 12,
+      "applicationService": 14,
+      "evaluationService": 24,
+      "guardianService": 9,
+      "dashboardService": 1,
+      "notificationService": 0
+    },
+    "byMethod": {
+      "GET": 46,
+      "POST": 18,
+      "PUT": 15,
+      "PATCH": 2,
+      "DELETE": 6
+    },
+    "requiresAuth": 84,
+    "publicEndpoints": 3
+  }
+}

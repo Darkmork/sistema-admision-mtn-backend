@@ -61,6 +61,12 @@ const SERVICES = {
   GUARDIAN_SERVICE: getServiceUrl('GUARDIAN_SERVICE_URL', 'http://localhost:8087')
 };
 
+// Log service URLs on startup for debugging
+logger.info('Service URLs configured:');
+Object.entries(SERVICES).forEach(([name, url]) => {
+  logger.info(`  ${name}: ${url}`);
+});
+
 // Rutas públicas que NO requieren autenticación
 // IMPORTANTE: Como el middleware se aplica en /api, los paths aquí NO deben incluir /api
 // Los endpoints /health de los microservicios SÍ requieren autenticación por seguridad
