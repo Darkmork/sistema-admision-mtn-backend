@@ -2,8 +2,8 @@ class Interview {
   constructor(data) {
     this.id = data.id;
     this.applicationId = data.applicationId || data.application_id;
-    this.interviewerId = data.interviewerId || data.interviewer_id;
-    this.interviewType = data.interviewType || data.interview_type;
+    this.interviewerId = data.interviewerId || data.interviewer_id || data.interviewer_user_id;
+    this.interviewType = data.interviewType || data.interview_type || data.type;
     this.scheduledDate = data.scheduledDate || data.scheduled_date;
     this.scheduledTime = data.scheduledTime || data.scheduled_time;
     this.duration = data.duration;
@@ -38,7 +38,7 @@ class Interview {
   toDatabase() {
     return {
       application_id: this.applicationId,
-      interviewer_id: this.interviewerId,
+      interviewer_user_id: this.interviewerId,
       interview_type: this.interviewType,
       scheduled_date: this.scheduledDate,
       scheduled_time: this.scheduledTime,

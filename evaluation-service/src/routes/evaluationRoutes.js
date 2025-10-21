@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const EvaluationController = require('../controllers/EvaluationController');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { validateCsrf } = require('../middleware/csrfMiddleware');
 const { validate, createEvaluationSchema, updateEvaluationSchema } = require('../middleware/validators');
 const { dbPool } = require('../config/database');
 
@@ -292,6 +293,7 @@ router.get('/:id', authenticate, EvaluationController.getEvaluationById.bind(Eva
 router.post(
   '/',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN', 'TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR'),
   validate(createEvaluationSchema),
   EvaluationController.createEvaluation.bind(EvaluationController)
@@ -300,6 +302,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN', 'TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR'),
   validate(updateEvaluationSchema),
   EvaluationController.updateEvaluation.bind(EvaluationController)
@@ -308,12 +311,13 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN'),
   EvaluationController.deleteEvaluation.bind(EvaluationController)
 );
 
 // POST /api/evaluations/:id/complete - Mark evaluation as complete
-router.post('/:id/complete', authenticate, requireRole('ADMIN', 'TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR'), async (req, res) => {
+router.post('/:id/complete', authenticate, validateCsrf, requireRole('ADMIN', 'TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR'), async (req, res) => {
   try {
     const { id } = req.params;
     const { score, recommendations, observations } = req.body;
@@ -353,7 +357,7 @@ router.post('/:id/complete', authenticate, requireRole('ADMIN', 'TEACHER', 'PSYC
 });
 
 // POST /api/evaluations/:id/assign - Assign evaluation to evaluator
-router.post('/:id/assign', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+router.post('/:id/assign', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
   try {
     const { id } = req.params;
     const { evaluatorId, evaluationDate } = req.body;
@@ -398,7 +402,7 @@ router.post('/:id/assign', authenticate, requireRole('ADMIN', 'COORDINATOR'), as
 });
 
 // POST /api/evaluations/:id/reschedule - Reschedule evaluation
-router.post('/:id/reschedule', authenticate, requireRole('ADMIN', 'COORDINATOR', 'TEACHER', 'PSYCHOLOGIST'), async (req, res) => {
+router.post('/:id/reschedule', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'TEACHER', 'PSYCHOLOGIST'), async (req, res) => {
   try {
     const { id } = req.params;
     const { evaluationDate } = req.body;
@@ -441,7 +445,7 @@ router.post('/:id/reschedule', authenticate, requireRole('ADMIN', 'COORDINATOR',
 });
 
 // POST /api/evaluations/:id/cancel - Cancel evaluation
-router.post('/:id/cancel', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+router.post('/:id/cancel', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -478,7 +482,7 @@ router.post('/:id/cancel', authenticate, requireRole('ADMIN', 'COORDINATOR'), as
 });
 
 // POST /api/evaluations/bulk/assign - Bulk assign evaluations
-router.post('/bulk/assign', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+router.post('/bulk/assign', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
   try {
     const { evaluationIds, evaluatorId, evaluationDate } = req.body;
 

@@ -6,8 +6,7 @@ const createEvaluationSchema = Joi.object({
   applicationId: Joi.number().integer().positive().required(),
   evaluationType: Joi.string().valid(
     'LANGUAGE_EXAM', 'MATHEMATICS_EXAM', 'ENGLISH_EXAM',
-    'APTITUDE_TEST', 'PSYCHOLOG_EVAL', 'FAMILY_INTERVIEW',
-    'STUDENT_INTERVIEW', 'DIRECTOR_INTERVIEW'
+    'CYCLE_DIRECTOR_REPORT', 'CYCLE_DIRECTOR_INTERVIEW', 'PSYCHOLOGICAL_INTERVIEW'
   ).required(),
   score: Joi.number().min(0).required(),
   maxScore: Joi.number().min(1).required(),
@@ -34,7 +33,7 @@ const createInterviewSchema = Joi.object({
   interviewerId: Joi.number().integer().positive().required(),
   secondInterviewerId: Joi.number().integer().positive().allow(null),
   type: Joi.string().valid(
-    'FAMILY', 'STUDENT', 'DIRECTOR', 'PSYCHOLOGIST', 'ACADEMIC'
+    'FAMILY', 'STUDENT', 'DIRECTOR', 'PSYCHOLOGIST', 'ACADEMIC', 'CYCLE_DIRECTOR'
   ).required(),
   mode: Joi.string().valid('IN_PERSON', 'VIRTUAL', 'HYBRID').default('IN_PERSON'),
   scheduledDate: Joi.string().required(), // Changed to string to accept date format from frontend

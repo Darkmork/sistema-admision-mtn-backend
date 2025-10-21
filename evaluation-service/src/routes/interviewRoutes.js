@@ -2,12 +2,25 @@ const express = require('express');
 const router = express.Router();
 const InterviewController = require('../controllers/InterviewController');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { validateCsrf } = require('../middleware/csrfMiddleware');
 const { validate, createInterviewSchema, updateInterviewSchema } = require('../middleware/validators');
 const { dbPool } = require('../config/database');
 
 // Public endpoint - Get list of available interviewers (no auth required)
+// Cached for 10 minutes since interviewer list doesn't change frequently
 router.get('/public/interviewers', async (req, res) => {
   try {
+    const cacheKey = 'interviewers:list:public';
+
+    // Try cache first
+    const cached = req.evaluationCache.get(cacheKey);
+    if (cached) {
+      console.log(`Cache HIT for interviewers list: ${cacheKey}`);
+      return res.json(cached);
+    }
+
+    console.log(`Cache MISS for interviewers list: ${cacheKey}`);
+
     // Get interviewers from users table (staff members who can interview)
     const result = await dbPool.query(`
       SELECT
@@ -40,6 +53,10 @@ router.get('/public/interviewers', async (req, res) => {
       educationalLevel: row.educational_level,
       scheduleCount: parseInt(row.schedule_count || 0)
     }));
+
+    // Cache for 10 minutes
+    req.evaluationCache.set(cacheKey, interviewers, 600000);
+    console.log(`Cached interviewers list: ${cacheKey}`);
 
     res.json(interviewers);
   } catch (error) {
@@ -101,9 +118,22 @@ router.get('/statistics', authenticate, async (req, res) => {
 });
 
 // GET /api/interviews/calendar - Get interviews for calendar view (MUST BE BEFORE /:id)
+// Cached for 3 minutes since calendar data is time-sensitive
 router.get('/calendar', authenticate, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
+
+    // Build cache key from date range
+    const cacheKey = `interviews:calendar:${startDate || 'all'}:${endDate || 'all'}`;
+
+    // Try cache first
+    const cached = req.evaluationCache.get(cacheKey);
+    if (cached) {
+      console.log(`Cache HIT for calendar: ${cacheKey}`);
+      return res.json(cached);
+    }
+
+    console.log(`Cache MISS for calendar: ${cacheKey}`);
 
     let query = `
       SELECT i.*,
@@ -145,11 +175,17 @@ router.get('/calendar', authenticate, async (req, res) => {
       applicationId: row.application_id
     }));
 
-    res.json({
+    const response = {
       success: true,
       data: events,
       count: events.length
-    });
+    };
+
+    // Cache for 3 minutes (calendar is time-sensitive)
+    req.evaluationCache.set(cacheKey, response, 180000);
+    console.log(`Cached calendar events: ${cacheKey}`);
+
+    res.json(response);
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -161,6 +197,9 @@ router.get('/calendar', authenticate, async (req, res) => {
 
 // GET /api/interviews/application/:applicationId - MUST BE BEFORE /:id
 router.get('/application/:applicationId', authenticate, InterviewController.getInterviewsByApplicationId.bind(InterviewController));
+
+// POST /api/interviews/application/:applicationId/send-summary - Send interview summary via email
+router.post('/application/:applicationId/send-summary', authenticate, validateCsrf, InterviewController.sendInterviewSummary.bind(InterviewController));
 
 // GET /api/interviews/available-slots - Get available interview slots (MUST BE BEFORE /:id)
 router.get('/available-slots', authenticate, async (req, res) => {
@@ -283,6 +322,7 @@ router.get('/:id', authenticate, InterviewController.getInterviewById.bind(Inter
 router.post(
   '/',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN', 'COORDINATOR', 'CYCLE_DIRECTOR'),
   validate(createInterviewSchema),
   InterviewController.createInterview.bind(InterviewController)
@@ -291,6 +331,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN', 'COORDINATOR', 'CYCLE_DIRECTOR'),
   validate(updateInterviewSchema),
   InterviewController.updateInterview.bind(InterviewController)
@@ -299,6 +340,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN'),
   InterviewController.deleteInterview.bind(InterviewController)
 );

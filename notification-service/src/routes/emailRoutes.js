@@ -185,4 +185,83 @@ router.post('/verify-code', async (req, res) => {
   }
 });
 
+/**
+ * @route   POST /api/email/send-test
+ * @desc    Send a test email (for testing purposes)
+ * @access  Public (should be protected in production)
+ * @body    { to, subject?, message?, firstName?, lastName? }
+ */
+router.post('/send-test', async (req, res) => {
+  try {
+    const { to, subject, message, firstName, lastName } = req.body;
+
+    if (!to) {
+      return res.status(422).json(fail('EMAIL_TEST_001', 'Recipient email (to) is required'));
+    }
+
+    // Default subject and message if not provided
+    const emailSubject = subject || '🧪 Correo de Prueba - Sistema de Admisión MTN';
+    const emailMessage = message || `
+Hola ${firstName || 'Usuario'} ${lastName || ''},
+
+Este es un correo de prueba del Sistema de Admisión del Colegio Monte Tabor y Nazaret (MTN).
+
+📧 **Detalles del envío:**
+- Fecha: ${new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' })}
+- Sistema: Notification Service (Puerto 8085)
+- Servidor SMTP: ${process.env.SMTP_HOST || 'smtp.gmail.com'}
+- Modo: ${process.env.EMAIL_MOCK_MODE === 'true' ? 'SIMULACIÓN (no se envía realmente)' : 'PRODUCCIÓN (envío real)'}
+
+✅ **Estado:**
+Si recibes este correo, significa que el servicio de notificaciones está funcionando correctamente.
+
+---
+
+*Este es un mensaje automático generado por el Sistema de Admisión MTN.*
+*Por favor, no respondas a este correo.*
+
+Saludos cordiales,
+**Equipo Técnico - Colegio MTN**
+    `.trim();
+
+    // Send email using email service
+    logger.info(`📤 Sending test email to: ${to}`);
+
+    try {
+      const result = await emailService.sendEmail(to, emailSubject, emailMessage);
+
+      logger.info(`✅ Test email sent successfully to ${to}`, {
+        messageId: result.messageId,
+        accepted: result.accepted,
+        rejected: result.rejected
+      });
+
+      res.json(ok({
+        message: 'Test email sent successfully',
+        recipient: to,
+        subject: emailSubject,
+        messageId: result.messageId,
+        accepted: result.accepted,
+        rejected: result.rejected,
+        timestamp: new Date().toISOString(),
+        mockMode: process.env.EMAIL_MOCK_MODE === 'true'
+      }));
+    } catch (emailError) {
+      logger.error('❌ Error sending test email:', emailError);
+
+      return res.status(500).json(fail('EMAIL_TEST_002', 'Failed to send test email', {
+        error: emailError.message,
+        details: emailError.stack,
+        smtpHost: process.env.SMTP_HOST,
+        smtpPort: process.env.SMTP_PORT,
+        smtpUser: process.env.SMTP_USER,
+        mockMode: process.env.EMAIL_MOCK_MODE === 'true'
+      }));
+    }
+  } catch (error) {
+    logger.error('Error in send-test endpoint:', error);
+    res.status(500).json(fail('EMAIL_TEST_003', 'Internal error sending test email', error.message));
+  }
+});
+
 module.exports = router;

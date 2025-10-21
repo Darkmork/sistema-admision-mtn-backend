@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const ApplicationController = require('../controllers/ApplicationController');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { validateCsrf } = require('../middleware/csrfMiddleware');
 const { validate, createApplicationSchema, updateApplicationSchema, updateStatusSchema } = require('../middleware/validators');
 const { dbPool } = require('../config/database');
 
@@ -325,7 +326,7 @@ router.get('/special-category/:category', authenticate, async (req, res) => {
 });
 
 // POST /api/applications/bulk/update-status - Bulk update status (MUST BE BEFORE /:id routes)
-router.post('/bulk/update-status', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+router.post('/bulk/update-status', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
   try {
     const { applicationIds, status, notes } = req.body;
 
@@ -354,6 +355,10 @@ router.post('/bulk/update-status', authenticate, requireRole('ADMIN', 'COORDINAT
        RETURNING *`,
       [...applicationIds, status.toUpperCase(), notes || null]
     );
+
+    // Invalidate all cached application lists (bulk update)
+    const invalidated = req.applicationCache.invalidatePattern('applications:list:*');
+    console.log(`Cache invalidated after BULK UPDATE: ${invalidated} entries`);
 
     res.json({
       success: true,
@@ -384,6 +389,7 @@ router.get(
 router.post(
   '/',
   authenticate,
+  validateCsrf,
   validate(createApplicationSchema),
   ApplicationController.createApplication.bind(ApplicationController)
 );
@@ -391,6 +397,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
+  validateCsrf,
   validate(updateApplicationSchema),
   ApplicationController.updateApplication.bind(ApplicationController)
 );
@@ -398,6 +405,7 @@ router.put(
 router.patch(
   '/:id/status',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN', 'COORDINATOR'),
   validate(updateStatusSchema),
   ApplicationController.updateApplicationStatus.bind(ApplicationController)
@@ -406,6 +414,7 @@ router.patch(
 router.put(
   '/:id/archive',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN'),
   ApplicationController.archiveApplication.bind(ApplicationController)
 );
@@ -414,11 +423,12 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN'),
   async (req, res) => {
     try {
       const { id } = req.params;
-  
+
       const result = await dbPool.query(
         'DELETE FROM applications WHERE id = $1 RETURNING *',
         [parseInt(id)]
@@ -430,6 +440,10 @@ router.delete(
           error: `Aplicación ${id} no encontrada`
         });
       }
+
+      // Invalidate all cached application lists (application deleted)
+      const invalidated = req.applicationCache.invalidatePattern('applications:list:*');
+      console.log(`Cache invalidated after DELETE: ${invalidated} entries`);
 
       res.json({
         success: true,

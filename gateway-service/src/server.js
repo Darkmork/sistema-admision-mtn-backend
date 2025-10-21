@@ -2,7 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -11,23 +15,94 @@ const PORT = process.env.PORT || 8080;
 // JWT Secret - debe ser el mismo que usan los microservicios
 const JWT_SECRET = process.env.JWT_SECRET || 'mtn_secret_key_2025_admissions';
 
-// Middleware básico
-app.use(express.json());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+// ==============================================
+// MIDDLEWARE CONFIGURATION
+// ==============================================
+
+// Trust proxy - essential for Railway deployment and proper IP detection
+app.set('trust proxy', true);
+
+// Security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP as we're an API gateway
+  crossOriginEmbedderPolicy: false
 }));
 
-// Request logging
+// Compression for responses
+app.use(compression());
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per windowMs
+  message: {
+    success: false,
+    error: {
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Too many requests from this IP, please try again later'
+    }
+  },
+  standardHeaders: true, // Return rate limit info in headers
+  legacyHeaders: false,
+  // Validate trust proxy configuration for Railway deployment
+  validate: { trustProxy: false } // Disable validation since we're behind Railway proxy
+});
+
+app.use(limiter);
+
+// Request ID tracking
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path}`, {
-    ip: req.ip,
-    userAgent: req.get('user-agent')
-  });
+  req.id = req.headers['x-request-id'] || uuidv4();
+  res.setHeader('x-request-id', req.id);
   next();
 });
+
+// IMPORTANT: DO NOT parse request bodies before proxy routes!
+// Body parsing will be added AFTER proxy routes for gateway's own endpoints.
+// This prevents breaking the streaming proxy behavior.
+
+// CORS configuration for frontend
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  process.env.CORS_ORIGIN
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      logger.warn(`[CORS] Blocked request from origin: ${origin}`);
+      callback(null, false);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token', 'X-CSRF-Token'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // 10 minutes
+}));
+
+// Request logging with request ID
+app.use((req, res, next) => {
+  logger.info(`[${req.id}] ${req.method} ${req.path}`, {
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    requestId: req.id
+  });
+  console.log(`DEBUG: req.path="${req.path}" req.url="${req.url}" req.originalUrl="${req.originalUrl}"`);
+  next();
+});
+
+// ==============================================
+// SERVICE URL CONFIGURATION
+// ==============================================
 
 // URLs de los microservicios
 // Para Railway: usa variables de entorno que apuntan a networking privado
@@ -74,6 +149,11 @@ const PUBLIC_ROUTES = [
   '/auth/login',
   '/auth/register',
   '/auth/verify-email',
+  '/auth/public-key',
+  '/auth/check-email',           // Verificar si email existe
+  '/auth/send-verification',     // Enviar código de verificación
+  '/auth/csrf-token',            // Obtener CSRF token
+  '/students/validate-rut',      // Validar formato de RUT (público)
   '/applications/public/all',
   '/applications/stats',
   '/applications/statistics'
@@ -150,108 +230,193 @@ const authenticateJWT = (req, res, next) => {
   }
 };
 
-// Aplicar autenticación JWT a todas las rutas de API
-app.use('/api', authenticateJWT);
+// ==============================================
+// NOTE: JWT Authentication is handled by individual microservices
+// Each backend service has its own authenticate middleware
+// The gateway only acts as a proxy and forwards the Authorization header
+// ==============================================
 
-// Health check del gateway
+// Aplicar autenticación JWT a todas las rutas de API
+// COMMENTED OUT: Backend services handle their own authentication
+// app.use('/api', authenticateJWT);
+
+// ==============================================
+// HEALTH CHECK ENDPOINTS
+// ==============================================
+
+// Liveness probe - simple check if gateway is running
 app.get('/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
     data: {
       status: 'healthy',
       service: 'api-gateway',
       timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
+      uptime: process.uptime()
+    }
+  });
+});
+
+// Readiness probe - check if gateway is ready to serve traffic
+app.get('/ready', (req, res) => {
+  res.status(200).json({
+    success: true,
+    data: {
+      status: 'ready',
+      service: 'api-gateway',
+      timestamp: new Date().toISOString(),
       services: SERVICES
     }
   });
 });
 
-// Gateway status
+// Gateway status - detailed information
 app.get('/gateway/status', (req, res) => {
   res.json({
     success: true,
     data: {
       status: 'operational',
-      version: '2.0.0',
+      version: '2.1.0',
       type: 'express-gateway',
-      authentication: 'centralized-jwt',
-      timestamp: new Date().toISOString()
+      features: {
+        authentication: 'centralized-jwt',
+        rateLimit: 'enabled',
+        compression: 'enabled',
+        security: 'helmet',
+        requestTracking: 'uuid'
+      },
+      timestamp: new Date().toISOString(),
+      services: SERVICES
     }
   });
 });
 
-// Configuración de proxy para cada microservicio
-const proxyOptions = {
-  changeOrigin: true,
-  onProxyReq: (proxyReq, req) => {
-    // Propagar el token de autorización al microservicio
-    if (req.headers.authorization) {
-      proxyReq.setHeader('Authorization', req.headers.authorization);
-    }
+// ==============================================
+// PROXY CONFIGURATION (CORRECT PATTERN)
+// ==============================================
 
-    // Agregar información del usuario autenticado
-    if (req.user) {
-      proxyReq.setHeader('X-User-Id', req.user.userId);
-      proxyReq.setHeader('X-User-Email', req.user.email);
-      proxyReq.setHeader('X-User-Role', req.user.role);
-    }
-  },
-  logLevel: 'warn'
+/**
+ * Creates a properly configured proxy middleware for streaming requests.
+ * IMPORTANT: This function does NOT parse request bodies. http-proxy-middleware
+ * handles streaming natively. Body parsing happens AFTER proxy routes.
+ */
+const makeProxy = (target, path = '', additionalOptions = {}) => {
+  console.log(`[makeProxy] Creating proxy for target="${target}" path="${path}"`);
+  return createProxyMiddleware({
+    target,
+    changeOrigin: true,
+    xfwd: true, // Add X-Forwarded-* headers
+    timeout: 20000, // Client timeout (20s)
+    proxyTimeout: 15000, // Backend timeout (15s)
+    // If path is provided, prepend it back (Express strips it)
+    ...(path && {
+      pathRewrite: (pathStr, req) => {
+        const newPath = path + pathStr;
+        console.log(`[pathRewrite] "${pathStr}" → "${newPath}"`);
+        return newPath;
+      }
+    }),
+
+    onProxyReq: (proxyReq, req, res) => {
+      // Propagar request ID para tracking distribuido
+      if (req.id) {
+        proxyReq.setHeader('x-request-id', req.id);
+      }
+
+      // Propagar el token de autorización al microservicio
+      if (req.headers.authorization) {
+        proxyReq.setHeader('Authorization', req.headers.authorization);
+      }
+
+      // Propagar CSRF token (ambos formatos)
+      if (req.headers['x-csrf-token']) {
+        proxyReq.setHeader('x-csrf-token', req.headers['x-csrf-token']);
+      }
+      if (req.headers['X-CSRF-Token']) {
+        proxyReq.setHeader('X-CSRF-Token', req.headers['X-CSRF-Token']);
+      }
+
+      // Agregar información del usuario autenticado (si existe)
+      if (req.user) {
+        proxyReq.setHeader('X-User-Id', String(req.user.userId));
+        proxyReq.setHeader('X-User-Email', req.user.email);
+        proxyReq.setHeader('X-User-Role', req.user.role);
+      }
+
+      logger.debug(`[${req.id}] Proxying ${req.method} ${req.originalUrl} to ${target}`);
+    },
+
+    onProxyRes: (proxyRes, req, res) => {
+      logger.info(`[${req.id}] Proxy response from ${target}: ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
+    },
+
+    onError: (err, req, res) => {
+      logger.error(`[${req.id}] Proxy error to ${target} for ${req.method} ${req.originalUrl}:`, {
+        error: err.message,
+        stack: err.stack
+      });
+
+      // Si no se han enviado headers aún, responder con 502
+      if (!res.headersSent) {
+        res.status(502).json({
+          success: false,
+          error: {
+            code: 'GATEWAY_ERROR',
+            message: 'Error al comunicarse con el servicio backend',
+            details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+            target: process.env.NODE_ENV === 'development' ? target : undefined
+          }
+        });
+      }
+    },
+
+    // Merge additional options (e.g., filter)
+    ...additionalOptions
+  });
 };
 
-// Helper para crear proxies con logs de diagnóstico (incluye target)
-const makeProxy = (target, pathRewrite) => createProxyMiddleware({
-  ...proxyOptions,
-  target,
-  pathRewrite,
-  onError: (err, req, res) => {
-    // Loguear información detallada para depuración
-    logger.error(`Proxy error to ${target} for ${req.method} ${req.originalUrl}: ${err && err.message}`, { stack: err && err.stack });
+// ==============================================
+// PROXY ROUTES - Path-based routing (Express-native approach)
+// ==============================================
 
-    // Si no se han enviado headers aún, responder con 502 y detalles mínimos
-    if (!res.headersSent) {
-      res.status(502).json({
-        success: false,
-        error: {
-          code: 'GATEWAY_ERROR',
-          message: 'Error al comunicarse con el servicio',
-          details: err && err.message,
-          target
-        }
-      });
-    }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    logger.info(`Proxy response from ${target} for ${req.method} ${req.originalUrl}: ${proxyRes.statusCode}`);
-  }
-});
+// Proxy para User Service - /api/users and /api/auth
+app.use('/api/users', makeProxy(SERVICES.USER_SERVICE, '/api/users'));
+app.use('/api/auth', makeProxy(SERVICES.USER_SERVICE, '/api/auth'));
 
-// Proxy para User Service
-app.use('/api/users', makeProxy(SERVICES.USER_SERVICE, { '^/api/users': '/api/users' }));
+// Proxy para Application Service - /api/applications, /api/students, /api/documents
+app.use('/api/applications', makeProxy(SERVICES.APPLICATION_SERVICE, '/api/applications'));
+app.use('/api/students', makeProxy(SERVICES.APPLICATION_SERVICE, '/api/students'));
+app.use('/api/documents', makeProxy(SERVICES.APPLICATION_SERVICE, '/api/documents'));
 
-app.use('/api/auth', makeProxy(SERVICES.USER_SERVICE, { '^/api/auth': '/api/auth' }));
+// Proxy para Evaluation Service - /api/evaluations, /api/interviews
+app.use('/api/evaluations', makeProxy(SERVICES.EVALUATION_SERVICE, '/api/evaluations'));
+app.use('/api/interviews', makeProxy(SERVICES.EVALUATION_SERVICE, '/api/interviews'));
 
-// Proxy para Application Service
-app.use('/api/applications', makeProxy(SERVICES.APPLICATION_SERVICE, { '^/api/applications': '/api/applications' }));
+// Proxy para Notification Service - /api/notifications
+app.use('/api/notifications', makeProxy(SERVICES.NOTIFICATION_SERVICE, '/api/notifications'));
 
-app.use('/api/students', makeProxy(SERVICES.APPLICATION_SERVICE, { '^/api/students': '/api/students' }));
+// Proxy para Dashboard Service - /api/dashboard, /api/analytics
+app.use('/api/dashboard', makeProxy(SERVICES.DASHBOARD_SERVICE, '/api/dashboard'));
+app.use('/api/analytics', makeProxy(SERVICES.DASHBOARD_SERVICE, '/api/analytics'));
 
-app.use('/api/documents', makeProxy(SERVICES.APPLICATION_SERVICE, { '^/api/documents': '/api/documents' }));
+// Proxy para Guardian Service - /api/guardians
+app.use('/api/guardians', makeProxy(SERVICES.GUARDIAN_SERVICE, '/api/guardians'));
 
-// Proxy para Evaluation Service
-app.use('/api/evaluations', makeProxy(SERVICES.EVALUATION_SERVICE, { '^/api/evaluations': '/api/evaluations' }));
+// ==============================================
+// GATEWAY-SPECIFIC ROUTES (WITH BODY PARSING)
+// ==============================================
 
-app.use('/api/interviews', makeProxy(SERVICES.EVALUATION_SERVICE, { '^/api/interviews': '/api/interviews' }));
+// NOW we can safely parse bodies for gateway's own endpoints
+// These middlewares only apply to routes defined AFTER this point
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
-// Proxy para Notification Service
-app.use('/api/notifications', makeProxy(SERVICES.NOTIFICATION_SERVICE, { '^/api/notifications': '/api/notifications' }));
+// Gateway doesn't have its own POST/PUT routes yet, but this is
+// where you would add them (e.g., /gateway/admin/config)
 
-// Proxy para Dashboard Service
-app.use('/api/dashboard', makeProxy(SERVICES.DASHBOARD_SERVICE, { '^/api/dashboard': '/api/dashboard' }));
-
-// Proxy para Guardian Service
-app.use('/api/guardians', makeProxy(SERVICES.GUARDIAN_SERVICE, { '^/api/guardians': '/api/guardians' }));
+// ==============================================
+// ERROR HANDLERS
+// ==============================================
 
 // 404 handler
 app.use((req, res) => {

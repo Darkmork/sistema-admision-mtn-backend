@@ -22,8 +22,9 @@ class DocumentService {
         const result = await dbPool.query(
           `INSERT INTO documents (
             application_id, document_type, file_name, file_path,
-            file_size, mime_type, uploaded_by, approval_status
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            file_size, content_type, original_name, is_required, approval_status,
+            created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
           RETURNING *`,
           [
             applicationId,
@@ -32,7 +33,8 @@ class DocumentService {
             file.path,
             file.size,
             file.mimetype,
-            uploadedBy,
+            file.originalname,
+            false,
             'PENDING'
           ]
         );
@@ -51,7 +53,7 @@ class DocumentService {
   async getDocumentsByApplicationId(applicationId) {
     return await mediumQueryBreaker.fire(async () => {
       const result = await dbPool.query(
-        'SELECT * FROM documents WHERE application_id = $1 ORDER BY uploaded_at DESC',
+        'SELECT * FROM documents WHERE application_id = $1 ORDER BY created_at DESC',
         [applicationId]
       );
 
@@ -86,7 +88,7 @@ class DocumentService {
     return await writeOperationBreaker.fire(async () => {
       const result = await dbPool.query(
         `UPDATE documents
-         SET approval_status = $1, rejection_reason = $2, approved_by = $3, approved_at = NOW()
+         SET approval_status = $1, rejection_reason = $2, approved_by = $3, approval_date = NOW()
          WHERE id = $4
          RETURNING *`,
         [approvalStatus, rejectionReason, approvedBy, id]

@@ -11,13 +11,16 @@ class Document {
     this.fileName = data.fileName || data.file_name;
     this.filePath = data.filePath || data.file_path;
     this.fileSize = data.fileSize || data.file_size;
-    this.mimeType = data.mimeType || data.mime_type;
+    this.mimeType = data.mimeType || data.content_type || data.mime_type; // Handle both column names
+    this.originalName = data.originalName || data.original_name;
+    this.isRequired = data.isRequired !== undefined ? data.isRequired : data.is_required;
     this.approvalStatus = data.approvalStatus || data.approval_status || 'PENDING';
     this.rejectionReason = data.rejectionReason || data.rejection_reason;
-    this.uploadedBy = data.uploadedBy || data.uploaded_by;
-    this.uploadedAt = data.uploadedAt || data.uploaded_at;
+    this.uploadedAt = data.uploadedAt || data.created_at || data.uploaded_at;
     this.approvedBy = data.approvedBy || data.approved_by;
-    this.approvedAt = data.approvedAt || data.approved_at;
+    this.approvedAt = data.approvedAt || data.approval_date || data.approved_at;
+    this.createdAt = data.createdAt || data.created_at;
+    this.updatedAt = data.updatedAt || data.updated_at;
   }
 
   /**
@@ -32,12 +35,15 @@ class Document {
       filePath: this.filePath,
       fileSize: this.fileSize,
       mimeType: this.mimeType,
+      originalName: this.originalName,
+      isRequired: this.isRequired,
       approvalStatus: this.approvalStatus,
       rejectionReason: this.rejectionReason,
-      uploadedBy: this.uploadedBy,
       uploadedAt: this.uploadedAt,
       approvedBy: this.approvedBy,
-      approvedAt: this.approvedAt
+      approvedAt: this.approvedAt,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt
     };
   }
 
@@ -51,13 +57,13 @@ class Document {
       file_name: this.fileName,
       file_path: this.filePath,
       file_size: this.fileSize,
-      mime_type: this.mimeType,
+      content_type: this.mimeType,
+      original_name: this.originalName,
+      is_required: this.isRequired,
       approval_status: this.approvalStatus,
       rejection_reason: this.rejectionReason,
-      uploaded_by: this.uploadedBy,
-      uploaded_at: this.uploadedAt,
       approved_by: this.approvedBy,
-      approved_at: this.approvedAt
+      approval_date: this.approvedAt
     };
   }
 

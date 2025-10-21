@@ -1,7 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const logger = require('./utils/logger');
 const { ok } = require('./utils/responseHelpers');
 const notificationRoutes = require('./routes/notificationRoutes');
+const emailRoutes = require('./routes/emailRoutes');
 
 const app = express();
 
@@ -45,6 +47,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/email', emailRoutes);
 
 // 404 handler
 app.use((req, res) => {

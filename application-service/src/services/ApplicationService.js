@@ -90,21 +90,155 @@ class ApplicationService {
   }
 
   /**
-   * Get application by ID
+   * Get application by ID with all related data (student, parents, documents)
+   * Based on the original backend implementation
    */
   async getApplicationById(id) {
     return await mediumQueryBreaker.fire(async () => {
-      const result = await dbPool.query(
-        'SELECT * FROM applications WHERE id = $1 AND is_archived = false',
-        [id]
-      );
+      // Main application query with complete student and parent information
+      const appQuery = `
+        SELECT
+          a.*,
+
+          -- Student information
+          s.id as student_id,
+          s.first_name as student_first_name,
+          s.paternal_last_name as student_paternal_last_name,
+          s.maternal_last_name as student_maternal_last_name,
+          s.rut as student_rut,
+          s.birth_date as student_birth_date,
+          s.grade_applied as student_grade,
+          s.current_school as student_current_school,
+          s.address as student_address,
+          s.admission_preference as student_admission_preference,
+          s.email as student_email,
+          s.additional_notes as student_notes,
+          s.pais as student_pais,
+          s.region as student_region,
+          s.comuna as student_comuna,
+
+          -- Father information
+          f.id as father_id,
+          f.full_name as father_name,
+          f.rut as father_rut,
+          f.email as father_email,
+          f.phone as father_phone,
+          f.profession as father_profession,
+          f.address as father_address,
+
+          -- Mother information
+          m.id as mother_id,
+          m.full_name as mother_name,
+          m.rut as mother_rut,
+          m.email as mother_email,
+          m.phone as mother_phone,
+          m.profession as mother_profession,
+          m.address as mother_address,
+
+          -- Applicant user information (guardian who created the application)
+          au.email as applicant_email,
+          au.first_name as applicant_first_name,
+          au.last_name as applicant_last_name
+
+        FROM applications a
+        LEFT JOIN students s ON s.id = a.student_id
+        LEFT JOIN parents f ON f.id = a.father_id AND f.parent_type = 'FATHER'
+        LEFT JOIN parents m ON m.id = a.mother_id AND m.parent_type = 'MOTHER'
+        LEFT JOIN users au ON au.id = a.applicant_user_id
+        WHERE a.id = $1 AND a.is_archived = false
+      `;
+
+      const result = await dbPool.query(appQuery, [id]);
 
       if (result.rows.length === 0) {
         return null;
       }
 
-      logger.info(`Retrieved application ${id}`);
-      return Application.fromDatabaseRow(result.rows[0]);
+      const row = result.rows[0];
+
+      // Get documents data
+      const documentsQuery = `
+        SELECT
+          d.id,
+          d.document_type as name,
+          d.created_at as upload_date,
+          d.file_path,
+          d.file_name,
+          d.original_name,
+          d.file_size,
+          d.is_required,
+          d.approval_status,
+          d.reviewed_at,
+          d.reviewed_by
+        FROM documents d
+        WHERE d.application_id = $1
+        ORDER BY d.created_at DESC
+      `;
+      const documentsResult = await dbPool.query(documentsQuery, [id]);
+
+      // Build the complete application object matching original backend structure
+      const appData = {
+        ...row,
+        student: {
+          id: row.student_id,
+          firstName: row.student_first_name,
+          paternalLastName: row.student_paternal_last_name,
+          maternalLastName: row.student_maternal_last_name || '',
+          lastName: `${row.student_paternal_last_name || ''} ${row.student_maternal_last_name || ''}`.trim(),
+          fullName: `${row.student_first_name || ''} ${row.student_paternal_last_name || ''} ${row.student_maternal_last_name || ''}`.trim(),
+          rut: row.student_rut,
+          birthDate: row.student_birth_date,
+          gradeApplied: row.student_grade,
+          currentSchool: row.student_current_school || 'No especificado',
+          address: row.student_address || 'Dirección no especificada',
+          email: row.student_email,
+          notes: row.student_notes,
+          age: row.student_birth_date ? new Date().getFullYear() - new Date(row.student_birth_date).getFullYear() : null,
+          pais: row.student_pais || 'Chile',
+          region: row.student_region,
+          comuna: row.student_comuna,
+          admissionPreference: row.student_admission_preference || 'NINGUNA'
+        },
+        father: row.father_id ? {
+          id: row.father_id,
+          fullName: row.father_name,
+          rut: row.father_rut,
+          email: row.father_email,
+          phone: row.father_phone,
+          profession: row.father_profession,
+          address: row.father_address
+        } : null,
+        mother: row.mother_id ? {
+          id: row.mother_id,
+          fullName: row.mother_name,
+          rut: row.mother_rut,
+          email: row.mother_email,
+          phone: row.mother_phone,
+          profession: row.mother_profession,
+          address: row.mother_address
+        } : null,
+        applicantUser: row.applicant_email ? {
+          email: row.applicant_email,
+          firstName: row.applicant_first_name,
+          lastName: row.applicant_last_name
+        } : null,
+        documents: documentsResult.rows.map(doc => ({
+          id: doc.id,
+          name: doc.name,
+          fileName: doc.file_name,
+          originalName: doc.original_name,
+          uploadDate: doc.upload_date,
+          filePath: doc.file_path,
+          fileSize: doc.file_size,
+          isRequired: doc.is_required,
+          approval_status: doc.approval_status,
+          reviewed_at: doc.reviewed_at,
+          reviewed_by: doc.reviewed_by
+        }))
+      };
+
+      logger.info(`Retrieved application ${id} with ${row.father_id ? 1 : 0} father, ${row.mother_id ? 1 : 0} mother, ${documentsResult.rows.length} documents`);
+      return Application.fromDatabaseRow(appData);
     });
   }
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, requireRole } = require('../middleware/auth');
+const { validateCsrf } = require('../middleware/csrfMiddleware');
 const { dbPool } = require('../config/database');
 
 // GET /api/interviewer-schedules/interviewer/:interviewerId - Get all schedules for an interviewer
@@ -98,7 +99,8 @@ router.get('/interviewer/:interviewerId/year/:year', authenticate, async (req, r
 });
 
 // POST /api/interviewer-schedules - Create a new schedule
-router.post('/', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+// Invalidates interviewer cache since schedule count changes
+router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
   try {
     const { interviewer, dayOfWeek, startTime, endTime, year, specificDate, scheduleType, notes } = req.body;
     const interviewerId = interviewer?.id || interviewer;
@@ -124,6 +126,10 @@ router.post('/', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, 
     // Get user info
     const userResult = await dbPool.query('SELECT first_name, last_name, email, role FROM users WHERE id = $1', [interviewerId]);
     const user = userResult.rows[0];
+
+    // Invalidate interviewer list cache (schedule count changed)
+    const invalidated = req.evaluationCache.invalidatePattern('interviewers:*');
+    console.log(`Cache invalidated after schedule CREATE: ${invalidated} entries`);
 
     res.status(201).json({
       id: created.id,
@@ -156,7 +162,7 @@ router.post('/', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, 
 });
 
 // POST /api/interviewer-schedules/interviewer/:interviewerId/recurring/:year - Create recurring schedules
-router.post('/interviewer/:interviewerId/recurring/:year', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+router.post('/interviewer/:interviewerId/recurring/:year', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
   try {
     const { interviewerId, year } = req.params;
     const schedules = req.body;
@@ -218,7 +224,8 @@ router.post('/interviewer/:interviewerId/recurring/:year', authenticate, require
 });
 
 // PUT /api/interviewer-schedules/:id - Update schedule
-router.put('/:id', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+// Invalidates interviewer and interview caches since availability changes
+router.put('/:id', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
   try {
     const { id } = req.params;
     const { dayOfWeek, startTime, endTime, year, specificDate, scheduleType, notes, isActive } = req.body;
@@ -284,6 +291,10 @@ router.put('/:id', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req
       });
     }
 
+    // Invalidate interviewer and interview caches (availability changed)
+    const invalidated = req.evaluationCache.invalidatePattern('interviewers:*');
+    console.log(`Cache invalidated after schedule UPDATE: ${invalidated} entries`);
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating schedule:', error);
@@ -296,7 +307,7 @@ router.put('/:id', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req
 });
 
 // PUT /api/interviewer-schedules/:id/deactivate - Deactivate schedule
-router.put('/:id/deactivate', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+router.put('/:id/deactivate', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -329,7 +340,8 @@ router.put('/:id/deactivate', authenticate, requireRole('ADMIN', 'COORDINATOR'),
 });
 
 // DELETE /api/interviewer-schedules/:id - Delete schedule
-router.delete('/:id', authenticate, requireRole('ADMIN'), async (req, res) => {
+// Invalidates interviewer cache since schedule count changes
+router.delete('/:id', authenticate, validateCsrf, requireRole('ADMIN'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -341,6 +353,10 @@ router.delete('/:id', authenticate, requireRole('ADMIN'), async (req, res) => {
         error: 'Horario no encontrado'
       });
     }
+
+    // Invalidate interviewer list cache (schedule count changed)
+    const invalidated = req.evaluationCache.invalidatePattern('interviewers:*');
+    console.log(`Cache invalidated after schedule DELETE: ${invalidated} entries`);
 
     res.json({
       success: true,

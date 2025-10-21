@@ -10,10 +10,23 @@ const logger = require('../utils/logger');
 class ApplicationController {
   /**
    * GET /api/applications
+   * Implements caching for common filter combinations (10 min TTL)
    */
   async getAllApplications(req, res) {
     try {
       const { status, applicationYear, guardianRUT, page: pageNum = 0, limit = 10 } = req.query;
+
+      // Build cache key from query parameters
+      const cacheKey = `applications:list:${status || 'all'}:${applicationYear || 'all'}:${guardianRUT || 'all'}:page${pageNum}:limit${limit}`;
+
+      // Try to get from cache first
+      const cached = req.applicationCache.get(cacheKey);
+      if (cached) {
+        logger.info(`Cache HIT for applications list: ${cacheKey}`);
+        return res.json(cached);
+      }
+
+      logger.info(`Cache MISS for applications list: ${cacheKey}`);
 
       const filters = {
         ...(status && { status }),
@@ -27,14 +40,18 @@ class ApplicationController {
         parseInt(limit)
       );
 
-      return res.json(
-        page(
-          result.applications.map(app => app.toJSON()),
-          result.total,
-          result.page,
-          result.limit
-        )
+      const response = page(
+        result.applications.map(app => app.toJSON()),
+        result.total,
+        result.page,
+        result.limit
       );
+
+      // Cache the result for 10 minutes
+      req.applicationCache.set(cacheKey, response, 600000);
+      logger.info(`Cached applications list: ${cacheKey}`);
+
+      return res.json(response);
     } catch (error) {
       logger.error('Error getting applications:', error);
       return res.status(500).json(
@@ -68,10 +85,15 @@ class ApplicationController {
 
   /**
    * POST /api/applications
+   * Invalidates cache after creating new application
    */
   async createApplication(req, res) {
     try {
       const application = await ApplicationService.createApplication(req.body);
+
+      // Invalidate all cached application lists
+      const invalidated = req.applicationCache.invalidatePattern('applications:list:*');
+      logger.info(`Cache invalidated after CREATE: ${invalidated} entries`);
 
       return res.status(201).json(ok(application.toJSON()));
     } catch (error) {
@@ -91,6 +113,7 @@ class ApplicationController {
 
   /**
    * PUT /api/applications/:id
+   * Invalidates cache after updating application
    */
   async updateApplication(req, res) {
     try {
@@ -103,6 +126,10 @@ class ApplicationController {
         );
       }
 
+      // Invalidate all cached application lists
+      const invalidated = req.applicationCache.invalidatePattern('applications:list:*');
+      logger.info(`Cache invalidated after UPDATE: ${invalidated} entries`);
+
       return res.json(ok(application.toJSON()));
     } catch (error) {
       logger.error(`Error updating application ${req.params.id}:`, error);
@@ -114,6 +141,7 @@ class ApplicationController {
 
   /**
    * PATCH /api/applications/:id/status
+   * Invalidates cache after updating status
    */
   async updateApplicationStatus(req, res) {
     try {
@@ -134,6 +162,10 @@ class ApplicationController {
         );
       }
 
+      // Invalidate all cached application lists (status has changed)
+      const invalidated = req.applicationCache.invalidatePattern('applications:list:*');
+      logger.info(`Cache invalidated after STATUS UPDATE: ${invalidated} entries`);
+
       return res.json(ok(application.toJSON()));
     } catch (error) {
       logger.error(`Error updating application status ${req.params.id}:`, error);
@@ -145,6 +177,7 @@ class ApplicationController {
 
   /**
    * PUT /api/applications/:id/archive
+   * Invalidates cache after archiving application
    */
   async archiveApplication(req, res) {
     try {
@@ -156,6 +189,10 @@ class ApplicationController {
           fail('APP_010', `Application ${id} not found`)
         );
       }
+
+      // Invalidate all cached application lists (archived app removed from lists)
+      const invalidated = req.applicationCache.invalidatePattern('applications:list:*');
+      logger.info(`Cache invalidated after ARCHIVE: ${invalidated} entries`);
 
       return res.json(ok(application.toJSON()));
     } catch (error) {

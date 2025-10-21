@@ -64,11 +64,11 @@ class AuthController {
   }
 
   /**
-   * GET /api/auth/check-email
+   * POST /api/auth/check-email
    */
   async checkEmail(req, res) {
     try {
-      const { email } = req.query;
+      const { email } = req.body;
 
       if (!email) {
         return res.status(422).json({

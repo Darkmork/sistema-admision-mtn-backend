@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/authMiddleware');
+const { validateCsrf } = require('../middleware/csrfMiddleware');
 const bcrypt = require('bcryptjs');
 
 const router = express.Router();
@@ -547,7 +548,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // POST /api/users - Create new user
-router.post('/', authenticateToken, async (req, res) => {
+router.post('/', authenticateToken, validateCsrf, async (req, res) => {
   const client = await req.dbPool.connect();
   try {
     const hashedPassword = req.body.password ?
@@ -594,7 +595,7 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/users/:id - Update user
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, validateCsrf, async (req, res) => {
   const client = await req.dbPool.connect();
   try {
     let hashedPassword = null;
@@ -631,7 +632,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/users/:id - Delete user
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/:id', authenticateToken, validateCsrf, async (req, res) => {
   const client = await req.dbPool.connect();
   try {
     await client.query('DELETE FROM users WHERE id = $1', [parseInt(req.params.id)]);
@@ -656,7 +657,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // PATCH /api/users/:id/status - Toggle user active status
-router.patch('/:id/status', authenticateToken, async (req, res) => {
+router.patch('/:id/status', authenticateToken, validateCsrf, async (req, res) => {
   const client = await req.dbPool.connect();
   try {
     const { active } = req.body;
@@ -706,7 +707,7 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/users/:id/activate - Activate user
-router.put('/:id/activate', authenticateToken, async (req, res) => {
+router.put('/:id/activate', authenticateToken, validateCsrf, async (req, res) => {
   const client = await req.dbPool.connect();
   try {
     const result = await client.query(
@@ -744,7 +745,7 @@ router.put('/:id/activate', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/users/:id/deactivate - Deactivate user
-router.put('/:id/deactivate', authenticateToken, async (req, res) => {
+router.put('/:id/deactivate', authenticateToken, validateCsrf, async (req, res) => {
   const client = await req.dbPool.connect();
   try {
     const result = await client.query(
@@ -782,7 +783,7 @@ router.put('/:id/deactivate', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/users/:id/reset-password - Reset user password (admin only)
-router.put('/:id/reset-password', authenticateToken, async (req, res) => {
+router.put('/:id/reset-password', authenticateToken, validateCsrf, async (req, res) => {
   const client = await req.dbPool.connect();
   try {
     // Generate temporary password
@@ -822,7 +823,7 @@ router.put('/:id/reset-password', authenticateToken, async (req, res) => {
 });
 
 // POST /api/users/:id/reset-password - Reset user password (admin only) - DEPRECATED, use PUT
-router.post('/:id/reset-password', authenticateToken, async (req, res) => {
+router.post('/:id/reset-password', authenticateToken, validateCsrf, async (req, res) => {
   const client = await req.dbPool.connect();
   try {
     // Generate temporary password
@@ -861,7 +862,7 @@ router.post('/:id/reset-password', authenticateToken, async (req, res) => {
 });
 
 // POST /api/users/:id/verify-email - Verify user email
-router.post('/:id/verify-email', authenticateToken, async (req, res) => {
+router.post('/:id/verify-email', authenticateToken, validateCsrf, async (req, res) => {
   const client = await req.dbPool.connect();
   try {
     const result = await client.query(
@@ -894,7 +895,7 @@ router.post('/:id/verify-email', authenticateToken, async (req, res) => {
 });
 
 // PATCH /api/users/:id/preferences - Update user preferences
-router.patch('/:id/preferences', authenticateToken, async (req, res) => {
+router.patch('/:id/preferences', authenticateToken, validateCsrf, async (req, res) => {
   const client = await req.dbPool.connect();
   try {
     const { preferences } = req.body;

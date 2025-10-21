@@ -87,8 +87,8 @@ class EvaluationService {
       const result = await dbPool.query(
         `INSERT INTO evaluations (
           application_id, evaluator_id, evaluation_type, score, max_score,
-          strengths, areas_for_improvement, observations, recommendations, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          strengths, areas_for_improvement, observations, recommendations, status, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
         RETURNING *`,
         [
           dbData.application_id, dbData.evaluator_id, dbData.evaluation_type,

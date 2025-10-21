@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const GuardianController = require('../controllers/GuardianController');
 const { authenticate, requireRole } = require('../middleware/auth');
+const { validateCsrf } = require('../middleware/csrfMiddleware');
 const { validate } = require('../middleware/validators');
 
 /**
@@ -72,6 +73,7 @@ router.get(
 router.post(
   '/',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN', 'COORDINATOR'),
   validate('createGuardian'),
   GuardianController.createGuardian
@@ -86,6 +88,7 @@ router.post(
 router.put(
   '/:id',
   authenticate,
+  validateCsrf,
   validate('updateGuardian'),
   GuardianController.updateGuardian
 );
@@ -98,6 +101,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
+  validateCsrf,
   requireRole('ADMIN'),
   GuardianController.deleteGuardian
 );

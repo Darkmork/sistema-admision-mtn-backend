@@ -2,6 +2,7 @@ const express = require('express');
 const logger = require('./utils/logger');
 const { ok } = require('./utils/responseHelpers');
 const guardianRoutes = require('./routes/guardianRoutes');
+const { generateCsrfToken } = require('./middleware/csrfMiddleware');
 
 const app = express();
 
@@ -30,6 +31,24 @@ app.get('/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     version: '1.0.0'
   }));
+});
+
+// CSRF token endpoint (public)
+app.get('/api/csrf-token', (req, res) => {
+  try {
+    const token = generateCsrfToken();
+    res.json({
+      success: true,
+      csrfToken: token,
+      expiresIn: 3600 // 1 hour in seconds
+    });
+  } catch (error) {
+    logger.error('Error generating CSRF token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate CSRF token'
+    });
+  }
 });
 
 // Routes

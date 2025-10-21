@@ -133,9 +133,81 @@ const validate = (schema, property = 'body') => {
   };
 };
 
+// Student creation schema
+const createStudentSchema = Joi.object({
+  firstName: Joi.string().min(2).max(100).required()
+    .messages({
+      'string.min': 'First name must be at least 2 characters',
+      'string.max': 'First name cannot exceed 100 characters',
+      'any.required': 'First name is required'
+    }),
+  paternalLastName: Joi.string().min(2).max(100).required()
+    .messages({
+      'string.min': 'Paternal last name must be at least 2 characters',
+      'any.required': 'Paternal last name is required'
+    }),
+  maternalLastName: Joi.string().min(2).max(100).optional().allow('', null)
+    .messages({
+      'string.min': 'Maternal last name must be at least 2 characters'
+    }),
+  rut: Joi.string().custom(rutValidator, 'RUT validation').optional().allow('', null)
+    .messages({
+      'any.invalid': 'Invalid Chilean RUT format'
+    }),
+  birthDate: Joi.date().iso().max('now').optional().allow(null)
+    .messages({
+      'date.max': 'Birth date cannot be in the future'
+    }),
+  gradeApplied: Joi.string().valid(
+    'PRE_KINDER', 'KINDER',
+    '1_BASICO', '2_BASICO', '3_BASICO', '4_BASICO', '5_BASICO', '6_BASICO', '7_BASICO', '8_BASICO',
+    '1_MEDIO', '2_MEDIO', '3_MEDIO', '4_MEDIO'
+  ).optional().allow('', null)
+    .messages({
+      'any.only': 'Invalid grade level'
+    }),
+  currentSchool: Joi.string().max(200).optional().allow('', null),
+  address: Joi.string().max(300).optional().allow('', null),
+  email: Joi.string().email().optional().allow('', null)
+    .messages({
+      'string.email': 'Invalid email format'
+    }),
+  pais: Joi.string().max(100).optional().allow('', null).default('Chile'),
+  region: Joi.string().max(100).optional().allow('', null),
+  comuna: Joi.string().max(100).optional().allow('', null),
+  admissionPreference: Joi.string().max(200).optional().allow('', null),
+  additionalNotes: Joi.string().max(1000).optional().allow('', null)
+});
+
+// Student update schema (all fields optional except at least one must be present)
+const updateStudentSchema = Joi.object({
+  firstName: Joi.string().min(2).max(100),
+  paternalLastName: Joi.string().min(2).max(100),
+  maternalLastName: Joi.string().min(2).max(100).allow('', null),
+  rut: Joi.string().custom(rutValidator, 'RUT validation').allow('', null),
+  birthDate: Joi.date().iso().max('now').allow(null),
+  gradeApplied: Joi.string().valid(
+    'PRE_KINDER', 'KINDER',
+    '1_BASICO', '2_BASICO', '3_BASICO', '4_BASICO', '5_BASICO', '6_BASICO', '7_BASICO', '8_BASICO',
+    '1_MEDIO', '2_MEDIO', '3_MEDIO', '4_MEDIO'
+  ).allow('', null),
+  currentSchool: Joi.string().max(200).allow('', null),
+  address: Joi.string().max(300).allow('', null),
+  email: Joi.string().email().allow('', null),
+  pais: Joi.string().max(100).allow('', null),
+  region: Joi.string().max(100).allow('', null),
+  comuna: Joi.string().max(100).allow('', null),
+  admissionPreference: Joi.string().max(200).allow('', null),
+  additionalNotes: Joi.string().max(1000).allow('', null)
+}).min(1).messages({
+  'object.min': 'At least one field must be provided for update'
+});
+
 module.exports = {
   validate,
   createApplicationSchema,
   updateApplicationSchema,
-  updateStatusSchema
+  updateStatusSchema,
+  createStudentSchema,
+  updateStudentSchema
 };

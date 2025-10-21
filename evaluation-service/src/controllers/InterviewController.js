@@ -3,12 +3,28 @@ const { ok, page, fail } = require('../utils/responseHelpers');
 const logger = require('../utils/logger');
 
 class InterviewController {
+  /**
+   * GET /api/interviews
+   * Implements caching for common filter combinations (5 min TTL)
+   */
   async getAllInterviews(req, res) {
     const { dbPool } = require('../config/database');
 
     try {
       const { applicationId, interviewType, status, interviewerId, page: pageNum = 0, limit = 10 } = req.query;
       const offset = parseInt(pageNum) * parseInt(limit);
+
+      // Build cache key from query parameters
+      const cacheKey = `interviews:list:${applicationId || 'all'}:${interviewType || 'all'}:${status || 'all'}:${interviewerId || 'all'}:page${pageNum}:limit${limit}`;
+
+      // Try to get from cache first
+      const cached = req.evaluationCache.get(cacheKey);
+      if (cached) {
+        logger.info(`Cache HIT for interviews list: ${cacheKey}`);
+        return res.json(cached);
+      }
+
+      logger.info(`Cache MISS for interviews list: ${cacheKey}`);
 
       // Build WHERE clause
       let whereConditions = [];
@@ -87,13 +103,19 @@ class InterviewController {
         gradeApplied: row.grade_applied
       }));
 
-      return res.json({
+      const response = {
         success: true,
         data: interviews,
         count: total,
         page: parseInt(pageNum),
         limit: parseInt(limit)
-      });
+      };
+
+      // Cache the result for 5 minutes
+      req.evaluationCache.set(cacheKey, response, 300000);
+      logger.info(`Cached interviews list: ${cacheKey}`);
+
+      return res.json(response);
     } catch (error) {
       logger.error('Error getting interviews:', error);
       return res.status(500).json(fail('INT_001', 'Failed to retrieve interviews', error.message));
@@ -116,6 +138,10 @@ class InterviewController {
     }
   }
 
+  /**
+   * POST /api/interviews
+   * Invalidates cache after creating new interview
+   */
   async createInterview(req, res) {
     try {
       // Use interviewerId from request body (selected by admin)
@@ -139,6 +165,10 @@ class InterviewController {
 
       const interview = await InterviewService.createInterview(req.body, interviewerId);
 
+      // Invalidate all cached interview lists and calendar events
+      const invalidated = req.evaluationCache.invalidatePattern('interviews:*');
+      logger.info(`Cache invalidated after CREATE: ${invalidated} entries`);
+
       return res.status(201).json(ok(interview.toJSON()));
     } catch (error) {
       logger.error('Error creating interview:', error);
@@ -156,6 +186,10 @@ class InterviewController {
     }
   }
 
+  /**
+   * PUT /api/interviews/:id
+   * Invalidates cache after updating interview
+   */
   async updateInterview(req, res) {
     try {
       const { id } = req.params;
@@ -165,6 +199,10 @@ class InterviewController {
         return res.status(404).json(fail('INT_005', `Interview ${id} not found`));
       }
 
+      // Invalidate all cached interview lists and calendar events
+      const invalidated = req.evaluationCache.invalidatePattern('interviews:*');
+      logger.info(`Cache invalidated after UPDATE: ${invalidated} entries`);
+
       return res.json(ok(interview.toJSON()));
     } catch (error) {
       logger.error(`Error updating interview ${req.params.id}:`, error);
@@ -172,6 +210,10 @@ class InterviewController {
     }
   }
 
+  /**
+   * DELETE /api/interviews/:id
+   * Invalidates cache after deleting interview
+   */
   async deleteInterview(req, res) {
     try {
       const { id } = req.params;
@@ -180,6 +222,10 @@ class InterviewController {
       if (!interview) {
         return res.status(404).json(fail('INT_007', `Interview ${id} not found`));
       }
+
+      // Invalidate all cached interview lists and calendar events
+      const invalidated = req.evaluationCache.invalidatePattern('interviews:*');
+      logger.info(`Cache invalidated after DELETE: ${invalidated} entries`);
 
       return res.json(ok({ message: 'Interview deleted successfully', interview: interview.toJSON() }));
     } catch (error) {
