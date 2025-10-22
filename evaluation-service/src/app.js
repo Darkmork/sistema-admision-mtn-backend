@@ -4,7 +4,7 @@ const path = require('path');
 const compression = require('compression');
 const logger = require('./utils/logger');
 const { fail } = require('./utils/responseHelpers');
-const SimpleCache = require(path.join(__dirname, '../../shared/utils/SimpleCache'));
+const SimpleCache = require('./utils/SimpleCache');
 
 // Import routes
 const evaluationRoutes = require('./routes/evaluationRoutes');
