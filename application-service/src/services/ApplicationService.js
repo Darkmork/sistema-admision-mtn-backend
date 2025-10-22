@@ -245,53 +245,142 @@ class ApplicationService {
    */
   async createApplication(applicationData) {
     return await writeOperationBreaker.fire(async () => {
-      // The applications table uses foreign keys to students, parents, users tables
+      // The applications table uses foreign keys to students, parents, guardians, supporters
       // We need to create those records first, then link them in applications table
 
       // Step 1: Create student record
-      // Note: address column has NOT NULL constraint, using empty string as default
-      // Note: application_year is inferred from created_at timestamp (year of creation)
       const studentResult = await dbPool.query(
         `INSERT INTO students (
           first_name, paternal_last_name, maternal_last_name,
-          rut, birth_date, grade_applied, address, email,
-          admission_preference, pais, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+          rut, birth_date, grade_applied, current_school, address, email,
+          admission_preference, pais, region, comuna, additional_notes, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
         RETURNING id`,
         [
           applicationData.studentFirstName,
           applicationData.studentPaternalLastName,
-          applicationData.studentMaternalLastName,
+          applicationData.studentMaternalLastName || '',
           applicationData.studentRUT,
           applicationData.studentDateOfBirth,
           applicationData.gradeAppliedFor,
-          '', // address - required field, will be updated later
-          '', // email - optional but good to have placeholder
-          'NINGUNA', // admission_preference - default value
-          'Chile' // pais - default value
+          applicationData.studentCurrentSchool || '',
+          applicationData.studentAddress || '',
+          applicationData.studentEmail || '',
+          applicationData.studentAdmissionPreference || 'NINGUNA',
+          applicationData.studentPais || 'Chile',
+          applicationData.studentRegion || '',
+          applicationData.studentComuna || '',
+          applicationData.studentAdditionalNotes || ''
         ]
       );
-
       const studentId = studentResult.rows[0].id;
       logger.info(`Created student ${studentId}`);
 
-      // Step 2: Create application record with student_id FK
-      // Note: submission_date is required (NOT NULL), created_at and updated_at are required
-      // Note: applications table uses FKs for relationships, not flat data
+      // Step 2: Create father record (if data provided)
+      let fatherId = null;
+      if (applicationData.parent1Name && applicationData.parent1Rut) {
+        const fatherResult = await dbPool.query(
+          `INSERT INTO parents (
+            full_name, rut, email, phone, address, profession, parent_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+          RETURNING id`,
+          [
+            applicationData.parent1Name,
+            applicationData.parent1Rut,
+            applicationData.parent1Email || '',
+            applicationData.parent1Phone || '',
+            applicationData.parent1Address || '',
+            applicationData.parent1Profession || '',
+            'FATHER'
+          ]
+        );
+        fatherId = fatherResult.rows[0].id;
+        logger.info(`Created father ${fatherId}`);
+      }
+
+      // Step 3: Create mother record (if data provided)
+      let motherId = null;
+      if (applicationData.parent2Name && applicationData.parent2Rut) {
+        const motherResult = await dbPool.query(
+          `INSERT INTO parents (
+            full_name, rut, email, phone, address, profession, parent_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+          RETURNING id`,
+          [
+            applicationData.parent2Name,
+            applicationData.parent2Rut,
+            applicationData.parent2Email || '',
+            applicationData.parent2Phone || '',
+            applicationData.parent2Address || '',
+            applicationData.parent2Profession || '',
+            'MOTHER'
+          ]
+        );
+        motherId = motherResult.rows[0].id;
+        logger.info(`Created mother ${motherId}`);
+      }
+
+      // Step 4: Create guardian record (if data provided)
+      let guardianId = null;
+      if (applicationData.guardianName && applicationData.guardianRut) {
+        const guardianResult = await dbPool.query(
+          `INSERT INTO guardians (
+            full_name, rut, email, phone, relationship, created_at
+          ) VALUES ($1, $2, $3, $4, $5, NOW())
+          RETURNING id`,
+          [
+            applicationData.guardianName,
+            applicationData.guardianRut,
+            applicationData.guardianEmail || '',
+            applicationData.guardianPhone || '',
+            applicationData.guardianRelation || 'OTRO'
+          ]
+        );
+        guardianId = guardianResult.rows[0].id;
+        logger.info(`Created guardian ${guardianId}`);
+      }
+
+      // Step 5: Create supporter record (if data provided)
+      let supporterId = null;
+      if (applicationData.supporterName && applicationData.supporterRut) {
+        const supporterResult = await dbPool.query(
+          `INSERT INTO supporters (
+            full_name, rut, email, phone, relationship, created_at
+          ) VALUES ($1, $2, $3, $4, $5, NOW())
+          RETURNING id`,
+          [
+            applicationData.supporterName,
+            applicationData.supporterRut,
+            applicationData.supporterEmail || '',
+            applicationData.supporterPhone || '',
+            applicationData.supporterRelation || 'OTRO'
+          ]
+        );
+        supporterId = supporterResult.rows[0].id;
+        logger.info(`Created supporter ${supporterId}`);
+      }
+
+      // Step 6: Create application record linking all FKs
       const appResult = await dbPool.query(
         `INSERT INTO applications (
-          student_id, status, submission_date, created_at, updated_at
-        ) VALUES ($1, $2, NOW(), NOW(), NOW())
+          student_id, father_id, mother_id, guardian_id, supporter_id,
+          status, submission_date, created_at, updated_at, additional_notes
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), NOW(), $7)
         RETURNING *`,
         [
           studentId,
-          'PENDING'
+          fatherId,
+          motherId,
+          guardianId,
+          supporterId,
+          'PENDING',
+          applicationData.additionalNotes || ''
         ]
       );
 
-      logger.info(`Created application ${appResult.rows[0].id} for student ${studentId}`);
+      logger.info(`Created application ${appResult.rows[0].id} with student ${studentId}, father ${fatherId}, mother ${motherId}, guardian ${guardianId}, supporter ${supporterId}`);
 
-      // Return the application with student data joined
+      // Return the application with all related data joined
       return this.getApplicationById(appResult.rows[0].id);
     });
   }
