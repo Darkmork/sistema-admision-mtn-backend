@@ -27,14 +27,13 @@ router.get('/public/all', async (req, res) => {
               s.maternal_last_name as student_maternal_last_name
        FROM applications a
        LEFT JOIN students s ON a.student_id = s.id
-       WHERE a.is_archived = false
        ORDER BY a.submission_date DESC
        LIMIT $1 OFFSET $2`,
       [parseInt(limit), offset]
     );
 
     const countResult = await dbPool.query(
-      'SELECT COUNT(*) as total FROM applications WHERE is_archived = false'
+      'SELECT COUNT(*) as total FROM applications'
     );
 
     res.json({
@@ -65,7 +64,7 @@ router.get('/recent', authenticate, async (req, res) => {
 
     const result = await dbPool.query(
       `SELECT * FROM applications
-       WHERE is_archived = false
+      
        ORDER BY submission_date DESC
        LIMIT $1`,
       [parseInt(limit)]
@@ -142,7 +141,7 @@ router.get('/search', authenticate, async (req, res) => {
       paramIndex++;
     }
 
-    sqlQuery += ' AND a.is_archived = false ORDER BY a.submission_date DESC LIMIT 50';
+    sqlQuery += ' ORDER BY a.submission_date DESC LIMIT 50';
 
     const result = await dbPool.query(sqlQuery, params);
 
@@ -170,7 +169,7 @@ router.get('/export', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (
                            s.paternal_last_name as student_paternal_last_name, s.maternal_last_name as student_maternal_last_name
                     FROM applications a
                     LEFT JOIN students s ON a.student_id = s.id
-                    WHERE a.is_archived = false`;
+                   `;
     const params = [];
     let paramIndex = 1;
 
@@ -220,14 +219,14 @@ router.get('/status/:status', authenticate, async (req, res) => {
 
     const result = await dbPool.query(
       `SELECT * FROM applications
-       WHERE status = $1 AND is_archived = false
+       WHERE status = $1
        ORDER BY submission_date DESC
        LIMIT $2 OFFSET $3`,
       [status.toUpperCase(), parseInt(limit), offset]
     );
 
     const countResult = await dbPool.query(
-      'SELECT COUNT(*) as total FROM applications WHERE status = $1 AND is_archived = false',
+      'SELECT COUNT(*) as total FROM applications WHERE status = $1',
       [status.toUpperCase()]
     );
 

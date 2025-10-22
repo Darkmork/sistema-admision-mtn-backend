@@ -47,7 +47,7 @@ class ApplicationService {
         params.push(guardianRUT);
       }
 
-      query += ' AND a.is_archived = false';
+      query += '';
       query += ` ORDER BY a.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex}`;
       params.push(limit, offset);
 
@@ -145,7 +145,7 @@ class ApplicationService {
         LEFT JOIN parents f ON f.id = a.father_id AND f.parent_type = 'FATHER'
         LEFT JOIN parents m ON m.id = a.mother_id AND m.parent_type = 'MOTHER'
         LEFT JOIN users au ON au.id = a.applicant_user_id
-        WHERE a.id = $1 AND a.is_archived = false
+        WHERE a.id = $1
       `;
 
       const result = await dbPool.query(appQuery, [id]);
