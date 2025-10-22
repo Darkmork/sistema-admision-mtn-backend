@@ -7,6 +7,29 @@ const crypto = require('crypto');
 const emailService = require('../services/EmailService');
 
 /**
+ * @route   GET /api/email/config-status
+ * @desc    Check SMTP configuration status (for debugging)
+ * @access  Public (should be protected in production)
+ */
+router.get('/config-status', (req, res) => {
+  const isMockMode = process.env.EMAIL_MOCK_MODE === 'true';
+  const config = {
+    mockMode: isMockMode,
+    smtpConfigured: !isMockMode && !!(process.env.SMTP_USER && process.env.SMTP_PASSWORD),
+    smtpHost: process.env.SMTP_HOST || 'not configured',
+    smtpPort: process.env.SMTP_PORT || 'not configured',
+    smtpUser: process.env.SMTP_USER ? '***configured***' : 'not configured',
+    smtpPassword: process.env.SMTP_PASSWORD ? '***configured***' : 'not configured',
+    environment: process.env.NODE_ENV || 'development'
+  };
+
+  res.json(ok({
+    status: config.smtpConfigured ? 'SMTP Ready' : (isMockMode ? 'Mock Mode' : 'Not Configured'),
+    ...config
+  }));
+});
+
+/**
  * @route   GET /api/email/check-exists
  * @desc    Check if email already exists in the system (public endpoint for registration)
  * @access  Public
