@@ -143,18 +143,24 @@ Colegio MTN
     `.trim();
 
     // Send email using email service
+    let emailSent = false;
+    let emailError = null;
     try {
-      await emailService.sendEmail(email, subject, message);
-      logger.info(`Verification code sent to ${email}`);
-    } catch (emailError) {
-      logger.error('Error sending verification email:', emailError);
+      const emailResult = await emailService.sendEmail(email, subject, message);
+      emailSent = true;
+      logger.info(`Verification code sent to ${email}`, emailResult);
+    } catch (error) {
+      emailError = error.message;
+      logger.error('Error sending verification email:', error);
       // Continue anyway - code is stored in DB
     }
 
     res.json(ok({
       message: 'Verification code sent successfully',
       email: email.toLowerCase(),
-      expiresAt: expiresAt.toISOString()
+      expiresAt: expiresAt.toISOString(),
+      emailSent, // Include whether email was actually sent
+      ...(emailError && process.env.NODE_ENV !== 'production' && { emailError }) // Show error in dev
     }));
   } catch (error) {
     logger.error('Error sending verification code:', error);
