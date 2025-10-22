@@ -426,8 +426,9 @@ app.use('/api/documents', makeProxy(SERVICES.APPLICATION_SERVICE, '/api/document
 app.use('/api/evaluations', makeProxy(SERVICES.EVALUATION_SERVICE, '/api/evaluations'));
 app.use('/api/interviews', makeProxy(SERVICES.EVALUATION_SERVICE, '/api/interviews'));
 
-// Proxy para Notification Service - /api/notifications
+// Proxy para Notification Service - /api/notifications, /api/email
 app.use('/api/notifications', makeProxy(SERVICES.NOTIFICATION_SERVICE, '/api/notifications'));
+app.use('/api/email', makeProxy(SERVICES.NOTIFICATION_SERVICE, '/api/email'));
 
 // Proxy para Dashboard Service - /api/dashboard, /api/analytics
 app.use('/api/dashboard', makeProxy(SERVICES.DASHBOARD_SERVICE, '/api/dashboard'));
