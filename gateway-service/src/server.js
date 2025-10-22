@@ -100,6 +100,7 @@ app.use(cors({
     'x-correlation-id',
     'x-request-time',
     'x-timezone',
+    'x-client-type',
     'x-api-key',
     'x-request-id',
     'x-client-version',
