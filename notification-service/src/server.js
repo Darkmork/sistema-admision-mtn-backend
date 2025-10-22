@@ -13,13 +13,13 @@ const startServer = async () => {
     logger.info('Database connection established successfully');
     client.release();*/
 
-    // Start HTTP server
-    server = app.listen(PORT, () => {
+    // Start HTTP server (listen on 0.0.0.0 for Railway Private Networking)
+    server = app.listen(PORT, '0.0.0.0', () => {
       logger.info(`Notification Service running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`Email Mode: ${process.env.EMAIL_MOCK_MODE === 'true' ? 'MOCK' : 'PRODUCTION'}`);
       logger.info(`SMS Mode: ${process.env.SMS_MOCK_MODE === 'true' ? 'MOCK' : 'PRODUCTION'}`);
-      logger.info(`Health check: http://localhost:${PORT}/health`);
+      logger.info(`Health check: http://0.0.0.0:${PORT}/health`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

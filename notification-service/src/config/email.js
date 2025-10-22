@@ -22,13 +22,20 @@ const createEmailTransporter = () => {
     }
   });
 
-  transporter.verify((error) => {
-    if (error) {
-      logger.error('Email transport verification failed:', error);
-    } else {
-      logger.info('Email transport configured successfully');
-    }
-  });
+  // Verify connection asynchronously (non-blocking)
+  transporter.verify()
+    .then(() => {
+      logger.info('✅ Email transport configured successfully (SendGrid)');
+    })
+    .catch((error) => {
+      logger.warn('⚠️  Email transport verification failed (will retry on first send):', {
+        message: error.message,
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER ? '***configured***' : 'not set'
+      });
+      // Don't throw - let the service start and fail on actual send if needed
+    });
 
   return transporter;
 };
