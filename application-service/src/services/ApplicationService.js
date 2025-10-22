@@ -254,8 +254,8 @@ class ApplicationService {
         `INSERT INTO students (
           first_name, paternal_last_name, maternal_last_name,
           rut, birth_date, grade_applied, address, email,
-          admission_preference, pais, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+          admission_preference, pais, application_year, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
         RETURNING id`,
         [
           applicationData.studentFirstName,
@@ -267,7 +267,8 @@ class ApplicationService {
           '', // address - required field, will be updated later
           '', // email - optional but good to have placeholder
           'NINGUNA', // admission_preference - default value
-          'Chile' // pais - default value
+          'Chile', // pais - default value
+          applicationData.applicationYear // application year - CRITICAL field
         ]
       );
 
