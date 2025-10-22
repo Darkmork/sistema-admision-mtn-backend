@@ -291,6 +291,8 @@ router.get('/my-applications', authenticate, async (req, res) => {
       [parseInt(userId)]
     );
 
+    console.log(`Found ${result.rows.length} applications for user ${userId}`);
+
     res.json({
       success: true,
       data: result.rows,
