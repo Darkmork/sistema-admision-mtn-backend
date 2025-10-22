@@ -249,11 +249,13 @@ class ApplicationService {
       // We need to create those records first, then link them in applications table
 
       // Step 1: Create student record
+      // Note: address column has NOT NULL constraint, using empty string as default
       const studentResult = await dbPool.query(
         `INSERT INTO students (
           first_name, paternal_last_name, maternal_last_name,
-          rut, birth_date, grade_applied, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          rut, birth_date, grade_applied, address, email,
+          admission_preference, pais, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
         RETURNING id`,
         [
           applicationData.studentFirstName,
@@ -261,7 +263,11 @@ class ApplicationService {
           applicationData.studentMaternalLastName,
           applicationData.studentRUT,
           applicationData.studentDateOfBirth,
-          applicationData.gradeAppliedFor
+          applicationData.gradeAppliedFor,
+          '', // address - required field, will be updated later
+          '', // email - optional but good to have placeholder
+          'NINGUNA', // admission_preference - default value
+          'Chile' // pais - default value
         ]
       );
 
