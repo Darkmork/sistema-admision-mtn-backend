@@ -1,6 +1,6 @@
 const http = require('http');
 
-console.log('🔵 [SIMPLE] Starting notification service...');
+console.log('🔵 [SIMPLE] Starting notification service (v2)...');
 
 const PORT = process.env.PORT || 8085;
 
