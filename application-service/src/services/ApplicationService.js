@@ -276,11 +276,12 @@ class ApplicationService {
       logger.info(`Created student ${studentId}`);
 
       // Step 2: Create application record with student_id FK
-      // Using minimal fields - only student_id, status, and timestamps
+      // Note: submission_date is required (NOT NULL), created_at and updated_at are required
+      // Note: applications table uses FKs for relationships, not flat data
       const appResult = await dbPool.query(
         `INSERT INTO applications (
-          student_id, status, created_at, updated_at
-        ) VALUES ($1, $2, NOW(), NOW())
+          student_id, status, submission_date, created_at, updated_at
+        ) VALUES ($1, $2, NOW(), NOW(), NOW())
         RETURNING *`,
         [
           studentId,
