@@ -252,8 +252,8 @@ class ApplicationService {
         `INSERT INTO applications (
           student_first_name, student_paternal_last_name, student_maternal_last_name,
           student_rut, student_date_of_birth, student_gender, grade_applied_for,
-          guardian_rut, guardian_email, application_year, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          guardian_rut, guardian_email, application_year, status, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
         RETURNING *`,
         [
           dbData.student_first_name,
