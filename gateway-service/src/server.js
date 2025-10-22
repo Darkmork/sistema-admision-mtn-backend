@@ -91,8 +91,27 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token', 'X-CSRF-Token', 'x-correlation-id', 'x-request-time', 'x-timezone'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  // Allow all common headers including custom x-* headers from frontend
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-csrf-token',
+    'X-CSRF-Token',
+    'x-correlation-id',
+    'x-request-time',
+    'x-timezone',
+    'x-api-key',
+    'x-request-id',
+    'x-client-version',
+    'x-device-id',
+    'Accept',
+    'Accept-Language',
+    'Content-Language',
+    'Origin',
+    'Referer',
+    'User-Agent'
+  ],
+  exposedHeaders: ['Content-Range', 'X-Content-Range', 'x-request-id'],
   maxAge: 600 // 10 minutes
 }));
 

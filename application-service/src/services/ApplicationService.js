@@ -73,8 +73,6 @@ class ApplicationService {
         countParams.push(guardianRUT);
       }
 
-      countQuery += ' AND is_archived = false';
-
       const countResult = await dbPool.query(countQuery, countParams);
       const total = parseInt(countResult.rows[0].count);
 
@@ -303,7 +301,7 @@ class ApplicationService {
       fields.push(`updated_at = NOW()`);
       values.push(id);
 
-      const query = `UPDATE applications SET ${fields.join(', ')} WHERE id = $${paramIndex} AND is_archived = false RETURNING *`;
+      const query = `UPDATE applications SET ${fields.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
 
       const result = await dbPool.query(query, values);
 
@@ -324,7 +322,7 @@ class ApplicationService {
       const result = await dbPool.query(
         `UPDATE applications
          SET status = $1, notes = $2, reviewed_by = $3, reviewed_at = NOW(), updated_at = NOW()
-         WHERE id = $4 AND is_archived = false
+         WHERE id = $4
          RETURNING *`,
         [status, notes, reviewedBy, id]
       );
@@ -340,11 +338,14 @@ class ApplicationService {
 
   /**
    * Archive application
+   * Note: is_archived column doesn't exist in current schema
+   * This method is kept for API compatibility but does nothing
    */
   async archiveApplication(id) {
     return await writeOperationBreaker.fire(async () => {
+      // Since is_archived column doesn't exist, we just return the application as-is
       const result = await dbPool.query(
-        'UPDATE applications SET is_archived = true, updated_at = NOW() WHERE id = $1 RETURNING *',
+        'SELECT * FROM applications WHERE id = $1',
         [id]
       );
 
@@ -352,7 +353,7 @@ class ApplicationService {
         return null;
       }
 
-      logger.info(`Archived application ${id}`);
+      logger.info(`Archive requested for application ${id} (no-op - column doesn't exist)`);
       return Application.fromDatabaseRow(result.rows[0]);
     });
   }
@@ -362,7 +363,7 @@ class ApplicationService {
    */
   async getApplicationStats(applicationYear) {
     return await mediumQueryBreaker.fire(async () => {
-      let query = 'SELECT status, COUNT(*) as count FROM applications WHERE is_archived = false';
+      let query = 'SELECT status, COUNT(*) as count FROM applications WHERE 1=1';
       const params = [];
 
       if (applicationYear) {
