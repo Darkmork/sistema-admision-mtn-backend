@@ -454,6 +454,25 @@ router.put(
   ApplicationController.archiveApplication.bind(ApplicationController)
 );
 
+// POST /api/applications/cache/clear - Clear application cache (admin only)
+router.post('/cache/clear', authenticate, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const invalidated = req.applicationCache.invalidatePattern('applications:list:*');
+    console.log(`Cache manually cleared: ${invalidated} entries`);
+
+    res.json({
+      success: true,
+      message: `Cache cleared successfully`,
+      entriesCleared: invalidated
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Error al limpiar cache'
+    });
+  }
+});
+
 // DELETE /api/applications/:id - Delete application (admin only)
 router.delete(
   '/:id',
