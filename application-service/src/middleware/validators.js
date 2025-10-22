@@ -17,6 +17,7 @@ const rutValidator = (value, helpers) => {
 
 // Application creation schema
 const createApplicationSchema = Joi.object({
+  // Required student fields
   studentFirstName: Joi.string().min(2).max(100).required()
     .messages({
       'string.min': 'Student first name must be at least 2 characters',
@@ -28,11 +29,7 @@ const createApplicationSchema = Joi.object({
       'string.min': 'Paternal last name must be at least 2 characters',
       'any.required': 'Paternal last name is required'
     }),
-  studentMaternalLastName: Joi.string().min(2).max(100).required()
-    .messages({
-      'string.min': 'Maternal last name must be at least 2 characters',
-      'any.required': 'Maternal last name is required'
-    }),
+  studentMaternalLastName: Joi.string().min(2).max(100).optional().allow(''),
   studentRUT: Joi.string().custom(rutValidator, 'RUT validation').required()
     .messages({
       'any.invalid': 'Invalid Chilean RUT format',
@@ -43,11 +40,6 @@ const createApplicationSchema = Joi.object({
       'date.max': 'Date of birth cannot be in the future',
       'any.required': 'Date of birth is required'
     }),
-  studentGender: Joi.string().valid('M', 'F', 'OTHER').required()
-    .messages({
-      'any.only': 'Gender must be M, F, or OTHER',
-      'any.required': 'Student gender is required'
-    }),
   gradeAppliedFor: Joi.string().valid(
     'PRE_KINDER', 'KINDER',
     '1_BASICO', '2_BASICO', '3_BASICO', '4_BASICO', '5_BASICO', '6_BASICO', '7_BASICO', '8_BASICO',
@@ -57,22 +49,49 @@ const createApplicationSchema = Joi.object({
       'any.only': 'Invalid grade level',
       'any.required': 'Grade applied for is required'
     }),
-  guardianRUT: Joi.string().custom(rutValidator, 'RUT validation').required()
-    .messages({
-      'any.invalid': 'Invalid guardian RUT format',
-      'any.required': 'Guardian RUT is required'
-    }),
-  guardianEmail: Joi.string().email().required()
-    .messages({
-      'string.email': 'Invalid email format',
-      'any.required': 'Guardian email is required'
-    }),
-  applicationYear: Joi.number().integer().min(2024).max(2030).required()
-    .messages({
-      'number.min': 'Application year must be 2024 or later',
-      'number.max': 'Application year cannot exceed 2030',
-      'any.required': 'Application year is required'
-    })
+
+  // Optional student fields
+  studentEmail: Joi.string().email().optional().allow(''),
+  studentAddress: Joi.string().max(300).optional().allow(''),
+  studentCurrentSchool: Joi.string().max(200).optional().allow(''),
+  studentAdmissionPreference: Joi.string().max(200).optional().allow(''),
+  studentPais: Joi.string().max(100).optional().allow(''),
+  studentRegion: Joi.string().max(100).optional().allow(''),
+  studentComuna: Joi.string().max(100).optional().allow(''),
+  studentAdditionalNotes: Joi.string().max(1000).optional().allow(''),
+
+  // Father (parent1) fields - all optional
+  parent1Name: Joi.string().max(255).optional().allow(''),
+  parent1Rut: Joi.string().optional().allow(''),
+  parent1Email: Joi.string().email().optional().allow(''),
+  parent1Phone: Joi.string().max(255).optional().allow(''),
+  parent1Address: Joi.string().max(255).optional().allow(''),
+  parent1Profession: Joi.string().max(255).optional().allow(''),
+
+  // Mother (parent2) fields - all optional
+  parent2Name: Joi.string().max(255).optional().allow(''),
+  parent2Rut: Joi.string().optional().allow(''),
+  parent2Email: Joi.string().email().optional().allow(''),
+  parent2Phone: Joi.string().max(255).optional().allow(''),
+  parent2Address: Joi.string().max(255).optional().allow(''),
+  parent2Profession: Joi.string().max(255).optional().allow(''),
+
+  // Guardian fields - all optional
+  guardianName: Joi.string().max(255).optional().allow(''),
+  guardianRut: Joi.string().optional().allow(''),
+  guardianEmail: Joi.string().email().optional().allow(''),
+  guardianPhone: Joi.string().max(255).optional().allow(''),
+  guardianRelation: Joi.string().max(255).optional().allow(''),
+
+  // Supporter fields - all optional
+  supporterName: Joi.string().max(255).optional().allow(''),
+  supporterRut: Joi.string().optional().allow(''),
+  supporterEmail: Joi.string().email().optional().allow(''),
+  supporterPhone: Joi.string().max(255).optional().allow(''),
+  supporterRelation: Joi.string().max(255).optional().allow(''),
+
+  // Additional notes
+  additionalNotes: Joi.string().max(1000).optional().allow('')
 });
 
 // Application update schema (all fields optional)
