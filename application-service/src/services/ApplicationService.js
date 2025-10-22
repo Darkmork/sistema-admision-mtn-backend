@@ -245,33 +245,48 @@ class ApplicationService {
    */
   async createApplication(applicationData) {
     return await writeOperationBreaker.fire(async () => {
-      const app = new Application(applicationData);
-      const dbData = app.toDatabase();
+      // The applications table uses foreign keys to students, parents, users tables
+      // We need to create those records first, then link them in applications table
 
-      const result = await dbPool.query(
-        `INSERT INTO applications (
-          student_first_name, student_paternal_last_name, student_maternal_last_name,
-          student_rut, student_date_of_birth, student_gender, grade_applied_for,
-          guardian_rut, guardian_email, application_year, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
-        RETURNING *`,
+      // Step 1: Create student record
+      const studentResult = await dbPool.query(
+        `INSERT INTO students (
+          first_name, paternal_last_name, maternal_last_name,
+          rut, birth_date, grade_applied, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        RETURNING id`,
         [
-          dbData.student_first_name,
-          dbData.student_paternal_last_name,
-          dbData.student_maternal_last_name,
-          dbData.student_rut,
-          dbData.student_date_of_birth,
-          dbData.student_gender,
-          dbData.grade_applied_for,
-          dbData.guardian_rut,
-          dbData.guardian_email,
-          dbData.application_year,
-          'PENDING'
+          applicationData.studentFirstName,
+          applicationData.studentPaternalLastName,
+          applicationData.studentMaternalLastName,
+          applicationData.studentRUT,
+          applicationData.studentDateOfBirth,
+          applicationData.gradeAppliedFor
         ]
       );
 
-      logger.info(`Created application ${result.rows[0].id}`);
-      return Application.fromDatabaseRow(result.rows[0]);
+      const studentId = studentResult.rows[0].id;
+      logger.info(`Created student ${studentId}`);
+
+      // Step 2: Create application record with student_id FK
+      const appResult = await dbPool.query(
+        `INSERT INTO applications (
+          student_id, application_year, status, school_preference,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, NOW(), NOW())
+        RETURNING *`,
+        [
+          studentId,
+          applicationData.applicationYear,
+          'PENDING',
+          'MONTE_TABOR' // Default school preference
+        ]
+      );
+
+      logger.info(`Created application ${appResult.rows[0].id} for student ${studentId}`);
+
+      // Return the application with student data joined
+      return this.getApplicationById(appResult.rows[0].id);
     });
   }
 
