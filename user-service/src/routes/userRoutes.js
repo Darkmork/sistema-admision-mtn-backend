@@ -282,6 +282,85 @@ router.get('/evaluators', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/users/guardians - Get guardian users (APODERADO role) with pagination (MUST BE BEFORE /:id)
+router.get('/guardians', authenticateToken, async (req, res) => {
+  const client = await req.dbPool.connect();
+  try {
+    const { page = 0, size = 15, search, active } = req.query;
+    const offset = parseInt(page) * parseInt(size);
+    const limit = parseInt(size);
+
+    // Build WHERE clause
+    let whereConditions = [`role = 'APODERADO'`];
+    const params = [];
+    let paramIndex = 1;
+
+    if (search && search.trim() !== '') {
+      const searchTerm = `%${search.toLowerCase()}%`;
+      whereConditions.push(`(
+        LOWER(first_name) LIKE $${paramIndex} OR
+        LOWER(last_name) LIKE $${paramIndex} OR
+        LOWER(email) LIKE $${paramIndex} OR
+        LOWER(rut) LIKE $${paramIndex}
+      )`);
+      params.push(searchTerm);
+      paramIndex++;
+    }
+
+    if (active !== undefined && active !== '') {
+      whereConditions.push(`active = $${paramIndex}`);
+      params.push(active === 'true' || active === true);
+      paramIndex++;
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    // Get total count
+    const countQuery = `SELECT COUNT(*) as count FROM users WHERE ${whereClause}`;
+    const countResult = await client.query(countQuery, params);
+    const totalElements = parseInt(countResult.rows[0].count);
+
+    // Get paginated data
+    params.push(limit);
+    params.push(offset);
+    const dataQuery = `
+      SELECT id, first_name as "firstName", last_name as "lastName", email, role,
+             rut, phone, active, email_verified as "emailVerified", created_at as "createdAt"
+      FROM users
+      WHERE ${whereClause}
+      ORDER BY first_name, last_name
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    const result = await client.query(dataQuery, params);
+
+    const users = result.rows.map(user => ({
+      ...user,
+      fullName: `${user.firstName} ${user.lastName}`
+    }));
+
+    res.json({
+      content: users,
+      number: parseInt(page),
+      size: parseInt(size),
+      totalElements,
+      totalPages: Math.ceil(totalElements / limit),
+      first: parseInt(page) === 0,
+      last: parseInt(page) >= Math.ceil(totalElements / limit) - 1,
+      numberOfElements: users.length,
+      empty: users.length === 0
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener usuarios apoderados',
+      details: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
 // GET /api/users/staff - Get staff users with pagination (MUST BE BEFORE /:id)
 router.get('/staff', authenticateToken, async (req, res) => {
   const client = await req.dbPool.connect();
