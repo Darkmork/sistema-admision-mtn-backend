@@ -133,6 +133,23 @@ class ApplicationService {
           m.profession as mother_profession,
           m.address as mother_address,
 
+          -- Guardian information
+          g.id as guardian_id,
+          g.full_name as guardian_name,
+          g.rut as guardian_rut,
+          g.email as guardian_email,
+          g.phone as guardian_phone,
+          g.relationship as guardian_relationship,
+          g.profession as guardian_profession,
+
+          -- Supporter information
+          sp.id as supporter_id,
+          sp.full_name as supporter_name,
+          sp.rut as supporter_rut,
+          sp.email as supporter_email,
+          sp.phone as supporter_phone,
+          sp.relationship as supporter_relationship,
+
           -- Applicant user information (guardian who created the application)
           au.email as applicant_email,
           au.first_name as applicant_first_name,
@@ -142,6 +159,8 @@ class ApplicationService {
         LEFT JOIN students s ON s.id = a.student_id
         LEFT JOIN parents f ON f.id = a.father_id AND f.parent_type = 'FATHER'
         LEFT JOIN parents m ON m.id = a.mother_id AND m.parent_type = 'MOTHER'
+        LEFT JOIN guardians g ON g.id = a.guardian_id
+        LEFT JOIN supporters sp ON sp.id = a.supporter_id
         LEFT JOIN users au ON au.id = a.applicant_user_id
         WHERE a.id = $1
       `;
@@ -216,6 +235,23 @@ class ApplicationService {
           profession: row.mother_profession,
           address: row.mother_address
         } : null,
+        guardian: row.guardian_id ? {
+          id: row.guardian_id,
+          fullName: row.guardian_name,
+          rut: row.guardian_rut,
+          email: row.guardian_email,
+          phone: row.guardian_phone,
+          relationship: row.guardian_relationship,
+          profession: row.guardian_profession
+        } : null,
+        supporter: row.supporter_id ? {
+          id: row.supporter_id,
+          fullName: row.supporter_name,
+          rut: row.supporter_rut,
+          email: row.supporter_email,
+          phone: row.supporter_phone,
+          relationship: row.supporter_relationship
+        } : null,
         applicantUser: row.applicant_email ? {
           email: row.applicant_email,
           firstName: row.applicant_first_name,
@@ -237,7 +273,7 @@ class ApplicationService {
         }))
       };
 
-      logger.info(`Retrieved application ${id} with ${row.father_id ? 1 : 0} father, ${row.mother_id ? 1 : 0} mother, ${documentsResult.rows.length} documents`);
+      logger.info(`Retrieved application ${id} with ${row.father_id ? 1 : 0} father, ${row.mother_id ? 1 : 0} mother, ${row.guardian_id ? 1 : 0} guardian, ${row.supporter_id ? 1 : 0} supporter, ${documentsResult.rows.length} documents`);
       return Application.fromDatabaseRow(appData);
     });
   }
