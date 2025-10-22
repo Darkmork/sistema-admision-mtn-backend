@@ -272,6 +272,40 @@ router.get('/user/:userId', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/applications/my-applications - Get applications for logged-in user (MUST BE BEFORE /:id)
+router.get('/my-applications', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Get applications where the user is the applicant_user_id OR guardian
+    const result = await dbPool.query(
+      `SELECT a.id, a.status, a.submission_date, a.created_at, a.updated_at,
+              s.rut as student_rut, s.first_name as student_first_name,
+              s.paternal_last_name as student_paternal_last_name,
+              s.maternal_last_name as student_maternal_last_name,
+              s.grade_applied as grade_applied
+       FROM applications a
+       LEFT JOIN students s ON a.student_id = s.id
+       WHERE a.applicant_user_id = $1
+       ORDER BY a.submission_date DESC`,
+      [parseInt(userId)]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows,
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error getting my applications:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener tus aplicaciones',
+      details: error.message
+    });
+  }
+});
+
 // GET /api/applications/for-evaluation/:evaluatorId - Applications assigned to evaluator (MUST BE BEFORE /:id)
 router.get('/for-evaluation/:evaluatorId', authenticate, async (req, res) => {
   try {
