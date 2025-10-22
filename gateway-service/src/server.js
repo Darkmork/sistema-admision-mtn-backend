@@ -307,6 +307,7 @@ const makeProxy = (target, path = '', additionalOptions = {}) => {
     target,
     changeOrigin: true,
     xfwd: true, // Add X-Forwarded-* headers
+    secure: false, // Allow self-signed certificates (for Railway internal URLs)
     timeout: 20000, // Client timeout (20s)
     proxyTimeout: 15000, // Backend timeout (15s)
     // If path is provided, prepend it back (Express strips it)
