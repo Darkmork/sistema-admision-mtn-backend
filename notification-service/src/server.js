@@ -8,21 +8,30 @@ let server;
 
 const startServer = async () => {
   try {
+    logger.info('🚀 Starting Notification Service...');
+    logger.info(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`📧 Email Mode: ${process.env.EMAIL_MOCK_MODE === 'true' ? 'MOCK' : 'PRODUCTION'}`);
+    logger.info(`📱 SMS Mode: ${process.env.SMS_MOCK_MODE === 'true' ? 'MOCK' : 'PRODUCTION'}`);
+
     // Test database connection
     /*const client = await dbPool.connect();
     logger.info('Database connection established successfully');
     client.release();*/
 
+    logger.info(`🌐 Starting HTTP server on 0.0.0.0:${PORT}...`);
+
     // Start HTTP server (listen on 0.0.0.0 for Railway Private Networking)
     server = app.listen(PORT, '0.0.0.0', () => {
-      logger.info(`Notification Service running on port ${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`Email Mode: ${process.env.EMAIL_MOCK_MODE === 'true' ? 'MOCK' : 'PRODUCTION'}`);
-      logger.info(`SMS Mode: ${process.env.SMS_MOCK_MODE === 'true' ? 'MOCK' : 'PRODUCTION'}`);
-      logger.info(`Health check: http://0.0.0.0:${PORT}/health`);
+      logger.info(`✅ Notification Service running on port ${PORT}`);
+      logger.info(`🏥 Health check: http://0.0.0.0:${PORT}/health`);
+    });
+
+    server.on('error', (error) => {
+      logger.error('❌ Server error:', error);
+      process.exit(1);
     });
   } catch (error) {
-    logger.error('Failed to start server:', error);
+    logger.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 };

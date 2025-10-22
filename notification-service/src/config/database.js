@@ -22,9 +22,13 @@ const dbPool = process.env.DATABASE_URL
     query_timeout: parseInt(process.env.DB_QUERY_TIMEOUT || '5000')
   });
 
-dbPool.on('connect', () => logger.info('New database connection established'));
-dbPool.on('error', (err) => logger.error('Unexpected database pool error:', err));
-dbPool.on('remove', () => logger.info('Database connection removed from pool'));
+// Temporarily disabled for Railway debugging
+// dbPool.on('connect', () => logger.info('New database connection established'));
+dbPool.on('error', (err) => {
+  logger.error('Unexpected database pool error:', err);
+  // Don't exit on pool errors - let circuit breakers handle it
+});
+// dbPool.on('remove', () => logger.info('Database connection removed from pool'));
 
 const testConnection = async () => {
   try {
