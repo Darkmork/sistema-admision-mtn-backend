@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const http = require('http');
+const https = require('https');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
@@ -8,6 +10,10 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('./utils/logger');
+
+// HTTP/HTTPS agents with keepAlive for better connection handling
+const httpAgent = new http.Agent({ keepAlive: true });
+const httpsAgent = new https.Agent({ keepAlive: true, rejectUnauthorized: false });
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -303,10 +309,16 @@ app.get('/gateway/status', (req, res) => {
  */
 const makeProxy = (target, path = '', additionalOptions = {}) => {
   console.log(`[makeProxy] Creating proxy for target="${target}" path="${path}"`);
+
+  // Determine which agent to use based on protocol
+  const targetUrl = new URL(target);
+  const agent = targetUrl.protocol === 'https:' ? httpsAgent : httpAgent;
+
   return createProxyMiddleware({
     target,
     changeOrigin: true,
     xfwd: true, // Add X-Forwarded-* headers
+    agent, // Use appropriate HTTP/HTTPS agent
     secure: false, // Allow self-signed certificates (for Railway internal URLs)
     timeout: 20000, // Client timeout (20s)
     proxyTimeout: 15000, // Backend timeout (15s)
