@@ -434,6 +434,9 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
+  console.error('=== UNHANDLED ERROR ===');
+  console.error(err);
+  console.error('Stack:', err.stack);
   logger.error('Unhandled error:', {
     message: err.message,
     stack: err.stack,
