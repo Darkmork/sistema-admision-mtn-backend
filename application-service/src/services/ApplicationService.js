@@ -275,15 +275,16 @@ class ApplicationService {
       logger.info(`Created student ${studentId}`);
 
       // Step 2: Create application record with student_id FK
+      // Note: application_year column doesn't exist in applications table
+      // The year is inferred from created_at timestamp
       const appResult = await dbPool.query(
         `INSERT INTO applications (
-          student_id, application_year, status, school_preference,
+          student_id, status, school_preference,
           created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, NOW(), NOW())
+        ) VALUES ($1, $2, $3, NOW(), NOW())
         RETURNING *`,
         [
           studentId,
-          applicationData.applicationYear,
           'PENDING',
           'MONTE_TABOR' // Default school preference
         ]
