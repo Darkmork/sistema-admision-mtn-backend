@@ -4,8 +4,9 @@
   "description": "Microservicio de notificaciones por email y SMS - Sistema de Admisión MTN",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "start": "node src/server-simple.js",
+    "start:full": "node src/server.js",
+    "dev": "nodemon src/server-simple.js",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "lint": "eslint src/**/*.js",
