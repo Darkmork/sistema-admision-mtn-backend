@@ -434,7 +434,11 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  logger.error('Unhandled error:', err);
+  logger.error('Unhandled error:', {
+    message: err.message,
+    stack: err.stack,
+    name: err.name
+  });
   res.status(500).json({
     success: false,
     error: {
