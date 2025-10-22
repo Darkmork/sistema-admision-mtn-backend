@@ -400,8 +400,21 @@ class ApplicationService {
 
       logger.info(`Created application ${appResult.rows[0].id} with student ${studentId}, father ${fatherId}, mother ${motherId}, guardian ${guardianId}, supporter ${supporterId}`);
 
-      // Return the application with all related data joined
-      return this.getApplicationById(appResult.rows[0].id);
+      // Return basic application data without documents (getApplicationById may fail if schema differs)
+      // This is a simplified response for creation - full data can be fetched separately if needed
+      const basicApp = {
+        id: appResult.rows[0].id,
+        studentId: studentId,
+        fatherId: fatherId,
+        motherId: motherId,
+        guardianId: guardianId,
+        supporterId: supporterId,
+        status: appResult.rows[0].status,
+        submissionDate: appResult.rows[0].submission_date,
+        createdAt: appResult.rows[0].created_at
+      };
+
+      return Application.fromDatabaseRow(basicApp);
     });
   }
 
