@@ -1,8 +1,18 @@
-const app = require('./app');
-const { dbPool } = require('./config/database');
-const logger = require('./utils/logger');
+// Wrap everything in try-catch to catch import errors
+try {
+  console.log('🔵 [INIT] Loading modules...');
+
+  const app = require('./app');
+  console.log('✅ [INIT] App loaded');
+
+  const { dbPool } = require('./config/database');
+  console.log('✅ [INIT] Database config loaded');
+
+  const logger = require('./utils/logger');
+  console.log('✅ [INIT] Logger loaded');
 
 const PORT = process.env.PORT || 8085;
+console.log(`✅ [INIT] Port configured: ${PORT}`);
 
 let server;
 
@@ -79,3 +89,9 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 startServer();
+
+} catch (error) {
+  console.error('❌ [INIT] Fatal error loading modules:', error);
+  console.error('Stack trace:', error.stack);
+  process.exit(1);
+}
