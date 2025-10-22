@@ -1,4 +1,5 @@
-const { createEmailTransporter } = require('../config/email');
+// Use SendGrid API instead of SMTP
+const { createEmailTransporter } = require('../config/email-sendgrid');
 const { externalServiceBreaker } = require('../config/circuitBreakers');
 const { renderTemplate } = require('../utils/templateEngine');
 const logger = require('../utils/logger');
