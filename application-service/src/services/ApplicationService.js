@@ -277,8 +277,11 @@ class ApplicationService {
       logger.info(`Created student ${studentId}`);
 
       // Step 2: Create father record (if data provided)
+      // Note: All fields are NOT NULL in parents table, so we need complete data
       let fatherId = null;
-      if (applicationData.parent1Name && applicationData.parent1Rut) {
+      if (applicationData.parent1Name && applicationData.parent1Rut &&
+          applicationData.parent1Email && applicationData.parent1Phone &&
+          applicationData.parent1Address && applicationData.parent1Profession) {
         const fatherResult = await dbPool.query(
           `INSERT INTO parents (
             full_name, rut, email, phone, address, profession, parent_type, created_at
@@ -287,20 +290,25 @@ class ApplicationService {
           [
             applicationData.parent1Name,
             applicationData.parent1Rut,
-            applicationData.parent1Email || '',
-            applicationData.parent1Phone || '',
-            applicationData.parent1Address || '',
-            applicationData.parent1Profession || '',
+            applicationData.parent1Email,
+            applicationData.parent1Phone,
+            applicationData.parent1Address,
+            applicationData.parent1Profession,
             'FATHER'
           ]
         );
         fatherId = fatherResult.rows[0].id;
         logger.info(`Created father ${fatherId}`);
+      } else {
+        logger.info('Skipping father creation - incomplete data');
       }
 
       // Step 3: Create mother record (if data provided)
+      // Note: All fields are NOT NULL in parents table, so we need complete data
       let motherId = null;
-      if (applicationData.parent2Name && applicationData.parent2Rut) {
+      if (applicationData.parent2Name && applicationData.parent2Rut &&
+          applicationData.parent2Email && applicationData.parent2Phone &&
+          applicationData.parent2Address && applicationData.parent2Profession) {
         const motherResult = await dbPool.query(
           `INSERT INTO parents (
             full_name, rut, email, phone, address, profession, parent_type, created_at
@@ -309,20 +317,25 @@ class ApplicationService {
           [
             applicationData.parent2Name,
             applicationData.parent2Rut,
-            applicationData.parent2Email || '',
-            applicationData.parent2Phone || '',
-            applicationData.parent2Address || '',
-            applicationData.parent2Profession || '',
+            applicationData.parent2Email,
+            applicationData.parent2Phone,
+            applicationData.parent2Address,
+            applicationData.parent2Profession,
             'MOTHER'
           ]
         );
         motherId = motherResult.rows[0].id;
         logger.info(`Created mother ${motherId}`);
+      } else {
+        logger.info('Skipping mother creation - incomplete data');
       }
 
       // Step 4: Create guardian record (if data provided)
+      // Note: All fields are NOT NULL in guardians table, so we need complete data
       let guardianId = null;
-      if (applicationData.guardianName && applicationData.guardianRut) {
+      if (applicationData.guardianName && applicationData.guardianRut &&
+          applicationData.guardianEmail && applicationData.guardianPhone &&
+          applicationData.guardianRelation) {
         const guardianResult = await dbPool.query(
           `INSERT INTO guardians (
             full_name, rut, email, phone, relationship, created_at
@@ -331,18 +344,23 @@ class ApplicationService {
           [
             applicationData.guardianName,
             applicationData.guardianRut,
-            applicationData.guardianEmail || '',
-            applicationData.guardianPhone || '',
-            applicationData.guardianRelation || 'OTRO'
+            applicationData.guardianEmail,
+            applicationData.guardianPhone,
+            applicationData.guardianRelation
           ]
         );
         guardianId = guardianResult.rows[0].id;
         logger.info(`Created guardian ${guardianId}`);
+      } else {
+        logger.info('Skipping guardian creation - incomplete data');
       }
 
       // Step 5: Create supporter record (if data provided)
+      // Note: All fields are NOT NULL in supporters table, so we need complete data
       let supporterId = null;
-      if (applicationData.supporterName && applicationData.supporterRut) {
+      if (applicationData.supporterName && applicationData.supporterRut &&
+          applicationData.supporterEmail && applicationData.supporterPhone &&
+          applicationData.supporterRelation) {
         const supporterResult = await dbPool.query(
           `INSERT INTO supporters (
             full_name, rut, email, phone, relationship, created_at
@@ -351,13 +369,15 @@ class ApplicationService {
           [
             applicationData.supporterName,
             applicationData.supporterRut,
-            applicationData.supporterEmail || '',
-            applicationData.supporterPhone || '',
-            applicationData.supporterRelation || 'OTRO'
+            applicationData.supporterEmail,
+            applicationData.supporterPhone,
+            applicationData.supporterRelation
           ]
         );
         supporterId = supporterResult.rows[0].id;
         logger.info(`Created supporter ${supporterId}`);
+      } else {
+        logger.info('Skipping supporter creation - incomplete data');
       }
 
       // Step 6: Create application record linking all FKs
