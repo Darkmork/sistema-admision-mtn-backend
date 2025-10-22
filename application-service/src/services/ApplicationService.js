@@ -154,8 +154,7 @@ class ApplicationService {
 
       const row = result.rows[0];
 
-      // Get documents data (compatible with both local and Railway schemas)
-      // Note: Railway DB may not have approval_status, approved_by, approval_date columns
+      // Get documents data with approval information
       const documentsQuery = `
         SELECT
           d.id,
@@ -165,7 +164,11 @@ class ApplicationService {
           d.file_name,
           d.original_name,
           d.file_size,
-          d.is_required
+          d.is_required,
+          d.approval_status,
+          d.approved_by,
+          d.approval_date,
+          d.rejection_reason
         FROM documents d
         WHERE d.application_id = $1
         ORDER BY d.created_at DESC
@@ -226,8 +229,11 @@ class ApplicationService {
           uploadDate: doc.upload_date,
           filePath: doc.file_path,
           fileSize: doc.file_size,
-          isRequired: doc.is_required
-          // Note: approval_status, reviewed_at, reviewed_by removed for Railway compatibility
+          isRequired: doc.is_required,
+          approvalStatus: doc.approval_status,
+          approvedBy: doc.approved_by,
+          approvalDate: doc.approval_date,
+          rejectionReason: doc.rejection_reason
         }))
       };
 
