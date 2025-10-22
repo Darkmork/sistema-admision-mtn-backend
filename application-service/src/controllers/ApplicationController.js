@@ -95,7 +95,8 @@ class ApplicationController {
       const invalidated = req.applicationCache.invalidatePattern('applications:list:*');
       logger.info(`Cache invalidated after CREATE: ${invalidated} entries`);
 
-      return res.status(201).json(ok(application.toJSON()));
+      // Service now returns a plain object (not a model instance)
+      return res.status(201).json(ok(application));
     } catch (error) {
       logger.error('Error creating application:', error);
 

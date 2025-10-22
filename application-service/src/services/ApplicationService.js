@@ -402,21 +402,15 @@ class ApplicationService {
 
       logger.info(`Created application ${appResult.rows[0].id} with student ${studentId}, father ${fatherId}, mother ${motherId}, guardian ${guardianId}, supporter ${supporterId}`);
 
-      // Return basic application data without documents (getApplicationById may fail if schema differs)
-      // This is a simplified response for creation - full data can be fetched separately if needed
-      const basicApp = {
+      // Return simple object with just the ID - frontend only needs this for document upload
+      // Full application data can be fetched with getApplicationById if needed
+      return {
         id: appResult.rows[0].id,
-        studentId: studentId,
-        fatherId: fatherId,
-        motherId: motherId,
-        guardianId: guardianId,
-        supporterId: supporterId,
         status: appResult.rows[0].status,
         submissionDate: appResult.rows[0].submission_date,
-        createdAt: appResult.rows[0].created_at
+        createdAt: appResult.rows[0].created_at,
+        studentId: studentId
       };
-
-      return Application.fromDatabaseRow(basicApp);
     });
   }
 
