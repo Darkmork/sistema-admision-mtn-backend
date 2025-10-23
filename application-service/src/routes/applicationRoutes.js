@@ -656,6 +656,74 @@ router.delete(
 );
 
 // ===========================
+// DOCUMENTS ENDPOINTS
+// ===========================
+
+/**
+ * GET /api/applications/:id/documents
+ * Get all documents for a specific application
+ */
+router.get('/:id/documents', authenticate, async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.id);
+
+    // Get documents for this application
+    const documentsResult = await dbPool.query(
+      `SELECT
+        d.id,
+        d.document_type,
+        d.file_name,
+        d.original_name,
+        d.file_path,
+        d.file_size,
+        d.mime_type,
+        d.is_required,
+        d.approval_status,
+        d.rejection_reason,
+        d.uploaded_by,
+        d.approved_by,
+        d.created_at,
+        d.updated_at
+      FROM documents d
+      WHERE d.application_id = $1
+      ORDER BY d.created_at DESC`,
+      [applicationId]
+    );
+
+    // Transform to camelCase
+    const documents = documentsResult.rows.map(doc => ({
+      id: doc.id,
+      documentType: doc.document_type,
+      fileName: doc.file_name,
+      originalName: doc.original_name,
+      filePath: doc.file_path,
+      fileSize: doc.file_size,
+      mimeType: doc.mime_type,
+      isRequired: doc.is_required,
+      approvalStatus: doc.approval_status,
+      rejectionReason: doc.rejection_reason,
+      uploadedBy: doc.uploaded_by,
+      approvedBy: doc.approved_by,
+      uploadDate: doc.created_at,
+      updatedAt: doc.updated_at
+    }));
+
+    res.json({
+      success: true,
+      data: documents,
+      count: documents.length
+    });
+  } catch (error) {
+    console.error('Error getting documents for application:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener documentos de la aplicación',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// ===========================
 // COMPLEMENTARY APPLICATION FORM ENDPOINTS
 // ===========================
 
