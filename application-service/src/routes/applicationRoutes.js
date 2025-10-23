@@ -277,16 +277,65 @@ router.get('/my-applications', authenticate, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    // Get applications where the user is the applicant_user_id OR guardian
+    // Get applications with ALL related data (student, parents, guardian, supporter)
     const result = await dbPool.query(
-      `SELECT a.id, a.status, a.submission_date, a.created_at, a.updated_at,
-              s.rut as student_rut, s.first_name as student_first_name,
-              s.paternal_last_name as student_paternal_last_name,
-              s.maternal_last_name as student_maternal_last_name,
-              s.grade_applied as grade_applied,
-              s.birth_date as birth_date
+      `SELECT
+        a.id, a.status, a.submission_date, a.created_at, a.updated_at, a.additional_notes,
+
+        -- Student information
+        s.id as student_id,
+        s.rut as student_rut,
+        s.first_name as student_first_name,
+        s.paternal_last_name as student_paternal_last_name,
+        s.maternal_last_name as student_maternal_last_name,
+        s.grade_applied as grade_applied,
+        s.birth_date as birth_date,
+        s.email as student_email,
+        s.address as student_address,
+        s.current_school as student_current_school,
+        s.admission_preference as student_admission_preference,
+
+        -- Father information
+        f.id as father_id,
+        f.full_name as father_name,
+        f.rut as father_rut,
+        f.email as father_email,
+        f.phone as father_phone,
+        f.profession as father_profession,
+        f.address as father_address,
+
+        -- Mother information
+        m.id as mother_id,
+        m.full_name as mother_name,
+        m.rut as mother_rut,
+        m.email as mother_email,
+        m.phone as mother_phone,
+        m.profession as mother_profession,
+        m.address as mother_address,
+
+        -- Guardian information
+        g.id as guardian_id,
+        g.full_name as guardian_name,
+        g.rut as guardian_rut,
+        g.email as guardian_email,
+        g.phone as guardian_phone,
+        g.relationship as guardian_relationship,
+        g.profession as guardian_profession,
+
+        -- Supporter information
+        sp.id as supporter_id,
+        sp.full_name as supporter_name,
+        sp.rut as supporter_rut,
+        sp.email as supporter_email,
+        sp.phone as supporter_phone,
+        sp.relationship as supporter_relationship
+
        FROM applications a
        LEFT JOIN students s ON a.student_id = s.id
+       LEFT JOIN parents f ON a.father_id = f.id AND f.parent_type = 'FATHER'
+       LEFT JOIN parents m ON a.mother_id = m.id AND m.parent_type = 'MOTHER'
+       LEFT JOIN guardians g ON a.guardian_id = g.id
+       LEFT JOIN supporters sp ON a.supporter_id = sp.id
        WHERE a.applicant_user_id = $1
        ORDER BY a.submission_date DESC`,
       [parseInt(userId)]
@@ -294,27 +343,102 @@ router.get('/my-applications', authenticate, async (req, res) => {
 
     console.log(`Found ${result.rows.length} applications for user ${userId}`);
 
-    // Transform flat data to nested structure that frontend expects
-    const transformedApplications = result.rows.map(row => ({
-      id: row.id,
-      status: row.status,
-      submissionDate: row.submission_date,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      student: {
-        firstName: row.student_first_name,
-        lastName: row.student_paternal_last_name,
-        maternalLastName: row.student_maternal_last_name,
-        rut: row.student_rut,
-        gradeApplied: row.grade_applied,
-        birthDate: row.birth_date || null
-      }
-    }));
+    // For each application, get its documents
+    const applicationsWithDocuments = await Promise.all(
+      result.rows.map(async (row) => {
+        // Get documents for this application
+        const documentsResult = await dbPool.query(
+          `SELECT
+            d.id,
+            d.document_type,
+            d.file_name,
+            d.original_name,
+            d.file_path,
+            d.file_size,
+            d.is_required,
+            d.approval_status,
+            d.created_at
+          FROM documents d
+          WHERE d.application_id = $1
+          ORDER BY d.created_at DESC`,
+          [row.id]
+        );
+
+        // Transform flat data to nested structure that frontend expects
+        return {
+          id: row.id,
+          status: row.status,
+          submissionDate: row.submission_date,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          additionalNotes: row.additional_notes,
+          student: {
+            id: row.student_id,
+            firstName: row.student_first_name,
+            lastName: row.student_paternal_last_name,
+            maternalLastName: row.student_maternal_last_name,
+            rut: row.student_rut,
+            gradeApplied: row.grade_applied,
+            birthDate: row.birth_date,
+            email: row.student_email,
+            address: row.student_address,
+            currentSchool: row.student_current_school,
+            admissionPreference: row.student_admission_preference
+          },
+          father: row.father_id ? {
+            id: row.father_id,
+            fullName: row.father_name,
+            rut: row.father_rut,
+            email: row.father_email,
+            phone: row.father_phone,
+            profession: row.father_profession,
+            address: row.father_address
+          } : null,
+          mother: row.mother_id ? {
+            id: row.mother_id,
+            fullName: row.mother_name,
+            rut: row.mother_rut,
+            email: row.mother_email,
+            phone: row.mother_phone,
+            profession: row.mother_profession,
+            address: row.mother_address
+          } : null,
+          guardian: row.guardian_id ? {
+            id: row.guardian_id,
+            fullName: row.guardian_name,
+            rut: row.guardian_rut,
+            email: row.guardian_email,
+            phone: row.guardian_phone,
+            relationship: row.guardian_relationship,
+            profession: row.guardian_profession
+          } : null,
+          supporter: row.supporter_id ? {
+            id: row.supporter_id,
+            fullName: row.supporter_name,
+            rut: row.supporter_rut,
+            email: row.supporter_email,
+            phone: row.supporter_phone,
+            relationship: row.supporter_relationship
+          } : null,
+          documents: documentsResult.rows.map(doc => ({
+            id: doc.id,
+            documentType: doc.document_type,
+            fileName: doc.file_name,
+            originalName: doc.original_name,
+            filePath: doc.file_path,
+            fileSize: doc.file_size,
+            isRequired: doc.is_required,
+            approvalStatus: doc.approval_status,
+            uploadDate: doc.created_at
+          }))
+        };
+      })
+    );
 
     res.json({
       success: true,
-      data: transformedApplications,
-      count: transformedApplications.length
+      data: applicationsWithDocuments,
+      count: applicationsWithDocuments.length
     });
   } catch (error) {
     console.error('Error getting my applications:', error);
