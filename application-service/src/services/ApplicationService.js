@@ -274,7 +274,9 @@ class ApplicationService {
       };
 
       logger.info(`Retrieved application ${id} with ${row.father_id ? 1 : 0} father, ${row.mother_id ? 1 : 0} mother, ${row.guardian_id ? 1 : 0} guardian, ${row.supporter_id ? 1 : 0} supporter, ${documentsResult.rows.length} documents`);
-      return Application.fromDatabaseRow(appData);
+      // Return appData directly - it already has the correct nested structure for the frontend
+      // Don't use Application model here because it expects flat fields, not nested objects
+      return appData;
     });
   }
 
