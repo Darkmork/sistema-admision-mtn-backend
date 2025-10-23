@@ -9,18 +9,25 @@ const logger = require('../utils/logger');
 /**
  * Mock JWT authentication middleware
  * Decodes base64-encoded JWT payload without verification
+ * Accepts token from Authorization header OR query parameter (for file downloads)
  */
 const authenticate = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    const queryToken = req.query.token;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Try to get token from header first, then from query parameter
+    let token;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (queryToken) {
+      // Allow token in query parameter for file downloads via window.open()
+      token = queryToken;
+    } else {
       return res.status(401).json(
         fail('AUTH_001', 'No authorization token provided')
       );
     }
-
-    const token = authHeader.substring(7);
 
     // Mock JWT decoding (development only)
     const parts = token.split('.');
