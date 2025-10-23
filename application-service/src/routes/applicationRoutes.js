@@ -947,4 +947,106 @@ router.post('/:id/complementary-form', authenticate, validateCsrf, async (req, r
   }
 });
 
+/**
+ * DEBUG ENDPOINT - System and Volume Information
+ * PUBLIC endpoint to diagnose Railway volume configuration
+ * GET /api/applications/debug/system-info
+ */
+router.get('/debug/system-info', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+
+  try {
+    // Determine which upload directory is being used
+    const uploadDir = process.env.UPLOAD_DIR ||
+                      process.env.RAILWAY_VOLUME_MOUNT_PATH ||
+                      (process.env.NODE_ENV === 'production' ? '/app/uploads' : './uploads');
+
+    const absoluteUploadDir = path.resolve(uploadDir);
+
+    // Check if directory exists and get stats
+    let dirInfo = {
+      exists: false,
+      isDirectory: false,
+      permissions: null,
+      files: []
+    };
+
+    if (fs.existsSync(absoluteUploadDir)) {
+      const stats = fs.statSync(absoluteUploadDir);
+      dirInfo.exists = true;
+      dirInfo.isDirectory = stats.isDirectory();
+      dirInfo.permissions = stats.mode.toString(8).slice(-3);
+
+      // Try to list files
+      try {
+        dirInfo.files = fs.readdirSync(absoluteUploadDir);
+      } catch (err) {
+        dirInfo.readError = err.message;
+      }
+    }
+
+    // Test write permissions
+    let writeTest = {
+      canWrite: false,
+      error: null
+    };
+
+    try {
+      const testFile = path.join(absoluteUploadDir, '.write-test');
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+      writeTest.canWrite = true;
+    } catch (err) {
+      writeTest.error = err.message;
+      writeTest.code = err.code;
+    }
+
+    // Get disk space info
+    let diskInfo = {};
+    try {
+      const diskUsage = require('child_process').execSync('df -h').toString();
+      diskInfo.raw = diskUsage;
+    } catch (err) {
+      diskInfo.error = 'Could not get disk usage';
+    }
+
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      environment: {
+        NODE_ENV: process.env.NODE_ENV,
+        UPLOAD_DIR: process.env.UPLOAD_DIR || '(not set)',
+        RAILWAY_VOLUME_MOUNT_PATH: process.env.RAILWAY_VOLUME_MOUNT_PATH || '(not set)',
+        MAX_FILE_SIZE: process.env.MAX_FILE_SIZE || '(not set)',
+        MAX_FILES: process.env.MAX_FILES || '(not set)',
+        isRailway: !!process.env.RAILWAY_ENVIRONMENT
+      },
+      paths: {
+        currentWorkingDirectory: process.cwd(),
+        uploadDirRelative: uploadDir,
+        uploadDirAbsolute: absoluteUploadDir,
+        __dirname: __dirname
+      },
+      uploadDirectory: dirInfo,
+      writeTest: writeTest,
+      system: {
+        platform: os.platform(),
+        tmpdir: os.tmpdir(),
+        homedir: os.homedir(),
+        hostname: os.hostname()
+      },
+      disk: diskInfo
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Error gathering system info',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 module.exports = router;
