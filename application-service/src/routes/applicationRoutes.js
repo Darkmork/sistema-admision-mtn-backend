@@ -766,24 +766,12 @@ router.get('/:id/complementary-form', authenticate, async (req, res) => {
       });
     }
 
-    // Get complementary form data
+    // Get complementary form data (now stored as JSONB)
     const formResult = await dbPool.query(
       `SELECT
         id,
         application_id,
-        other_schools,
-        father_name,
-        father_education,
-        father_current_activity,
-        mother_name,
-        mother_education,
-        mother_current_activity,
-        application_reasons,
-        school_change_reason,
-        family_values,
-        faith_experiences,
-        community_service_experiences,
-        children_descriptions,
+        form_data,
         is_submitted,
         submitted_at,
         created_at,
@@ -804,25 +792,13 @@ router.get('/:id/complementary-form', authenticate, async (req, res) => {
 
     const formData = formResult.rows[0];
 
-    // Transform snake_case to camelCase for frontend
+    // Return form data with JSONB form_data spread
     res.json({
       success: true,
       data: {
         id: formData.id,
         applicationId: formData.application_id,
-        otherSchools: formData.other_schools,
-        fatherName: formData.father_name,
-        fatherEducation: formData.father_education,
-        fatherCurrentActivity: formData.father_current_activity,
-        motherName: formData.mother_name,
-        motherEducation: formData.mother_education,
-        motherCurrentActivity: formData.mother_current_activity,
-        applicationReasons: formData.application_reasons,
-        schoolChangeReason: formData.school_change_reason,
-        familyValues: formData.family_values,
-        faithExperiences: formData.faith_experiences,
-        communityServiceExperiences: formData.community_service_experiences,
-        childrenDescriptions: formData.children_descriptions,
+        ...formData.form_data, // Spread the JSON data containing all form fields
         isSubmitted: formData.is_submitted,
         submittedAt: formData.submitted_at,
         createdAt: formData.created_at,
@@ -840,34 +816,16 @@ router.get('/:id/complementary-form', authenticate, async (req, res) => {
 });
 
 /**
- * POST /api/applications/:id/complementary-form
- * Save/update complementary form data for an application
- */
 router.post('/:id/complementary-form', authenticate, validateCsrf, async (req, res) => {
   try {
     const applicationId = parseInt(req.params.id);
     const userId = req.user.userId;
 
-    // Extract form data from request body
-    const {
-      otherSchools,
-      fatherName,
-      fatherEducation,
-      fatherCurrentActivity,
-      motherName,
-      motherEducation,
-      motherCurrentActivity,
-      applicationReasons,
-      schoolChangeReason,
-      familyValues,
-      faithExperiences,
-      communityServiceExperiences,
-      childrenDescriptions,
-      isSubmitted
-    } = req.body;
+    // Extract isSubmitted flag and all other data as form_data JSON
+    const { isSubmitted, ...formDataFields } = req.body;
 
-    // Validate required fields
-    if (!applicationReasons || !familyValues) {
+    // Validate required fields in form_data
+    if (!formDataFields.applicationReasons || !formDataFields.familyValues) {
       return res.status(400).json({
         success: false,
         error: 'Los campos de razones de postulación y valores familiares son obligatorios'
@@ -914,49 +872,24 @@ router.post('/:id/complementary-form', authenticate, validateCsrf, async (req, r
       });
     }
 
-    let formId;
     let formData;
     const submittedTimestamp = isSubmitted ? new Date() : null;
 
     if (existingFormResult.rows.length === 0) {
-      // Insert new form
+      // Insert new form with JSONB data
       const insertResult = await dbPool.query(
         `INSERT INTO complementary_application_forms (
           application_id,
-          other_schools,
-          father_name,
-          father_education,
-          father_current_activity,
-          mother_name,
-          mother_education,
-          mother_current_activity,
-          application_reasons,
-          school_change_reason,
-          family_values,
-          faith_experiences,
-          community_service_experiences,
-          children_descriptions,
+          form_data,
           is_submitted,
           submitted_at,
           created_at,
           updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         RETURNING *`,
         [
           applicationId,
-          otherSchools || null,
-          fatherName || null,
-          fatherEducation || null,
-          fatherCurrentActivity || null,
-          motherName || null,
-          motherEducation || null,
-          motherCurrentActivity || null,
-          applicationReasons,
-          schoolChangeReason || null,
-          familyValues,
-          faithExperiences || null,
-          communityServiceExperiences || null,
-          childrenDescriptions ? JSON.stringify(childrenDescriptions) : null,
+          JSON.stringify(formDataFields), // Store all form data as JSON
           isSubmitted || false,
           submittedTimestamp
         ]
@@ -965,43 +898,19 @@ router.post('/:id/complementary-form', authenticate, validateCsrf, async (req, r
       formData = insertResult.rows[0];
       console.log(`Created complementary form ${formData.id} for application ${applicationId}`);
     } else {
-      // Update existing form
-      formId = existingFormResult.rows[0].id;
+      // Update existing form with JSONB data
+      const formId = existingFormResult.rows[0].id;
 
       const updateResult = await dbPool.query(
         `UPDATE complementary_application_forms SET
-          other_schools = $1,
-          father_name = $2,
-          father_education = $3,
-          father_current_activity = $4,
-          mother_name = $5,
-          mother_education = $6,
-          mother_current_activity = $7,
-          application_reasons = $8,
-          school_change_reason = $9,
-          family_values = $10,
-          faith_experiences = $11,
-          community_service_experiences = $12,
-          children_descriptions = $13,
-          is_submitted = $14,
-          submitted_at = $15,
+          form_data = $1,
+          is_submitted = $2,
+          submitted_at = $3,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $16
+        WHERE id = $4
         RETURNING *`,
         [
-          otherSchools || null,
-          fatherName || null,
-          fatherEducation || null,
-          fatherCurrentActivity || null,
-          motherName || null,
-          motherEducation || null,
-          motherCurrentActivity || null,
-          applicationReasons,
-          schoolChangeReason || null,
-          familyValues,
-          faithExperiences || null,
-          communityServiceExperiences || null,
-          childrenDescriptions ? JSON.stringify(childrenDescriptions) : null,
+          JSON.stringify(formDataFields),
           isSubmitted || false,
           submittedTimestamp,
           formId
@@ -1012,7 +921,7 @@ router.post('/:id/complementary-form', authenticate, validateCsrf, async (req, r
       console.log(`Updated complementary form ${formId} for application ${applicationId}`);
     }
 
-    // Transform snake_case to camelCase for frontend
+    // Return form data with JSONB spread
     res.json({
       success: true,
       message: isSubmitted
@@ -1021,19 +930,7 @@ router.post('/:id/complementary-form', authenticate, validateCsrf, async (req, r
       data: {
         id: formData.id,
         applicationId: formData.application_id,
-        otherSchools: formData.other_schools,
-        fatherName: formData.father_name,
-        fatherEducation: formData.father_education,
-        fatherCurrentActivity: formData.father_current_activity,
-        motherName: formData.mother_name,
-        motherEducation: formData.mother_education,
-        motherCurrentActivity: formData.mother_current_activity,
-        applicationReasons: formData.application_reasons,
-        schoolChangeReason: formData.school_change_reason,
-        familyValues: formData.family_values,
-        faithExperiences: formData.faith_experiences,
-        communityServiceExperiences: formData.community_service_experiences,
-        childrenDescriptions: formData.children_descriptions,
+        ...formData.form_data, // Spread the JSON data
         isSubmitted: formData.is_submitted,
         submittedAt: formData.submitted_at,
         createdAt: formData.created_at,
