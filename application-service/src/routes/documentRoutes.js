@@ -11,11 +11,10 @@ const { validateCsrf } = require('../middleware/csrfMiddleware');
 const { upload } = require('../middleware/upload');
 
 // Upload documents (multipart/form-data)
-// TEMP: CSRF disabled for testing Vercel Blob
 router.post(
   '/',
   authenticate,
-  // validateCsrf,  // TEMP DISABLED
+  validateCsrf,
   upload.array('files'),
   DocumentController.uploadDocuments.bind(DocumentController)
 );
