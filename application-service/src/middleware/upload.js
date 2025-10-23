@@ -1,61 +1,17 @@
 /**
  * File Upload Middleware
  * Handles multipart/form-data file uploads using Multer
+ * Uses memory storage for Vercel Blob integration
  */
 
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { sanitizeFilename } = require('../utils/validations');
 const logger = require('../utils/logger');
 
-// Ensure upload directory exists
-// Railway: Use RAILWAY_VOLUME_MOUNT_PATH (persistent storage)
-// Local: ./uploads (relative path)
-//
-// IMPORTANT: Railway Volume permissions must be set in Start Command:
-//   mkdir -p $RAILWAY_VOLUME_MOUNT_PATH && chmod -R 777 $RAILWAY_VOLUME_MOUNT_PATH && node src/server.js
+logger.info('Using Vercel Blob for file storage (memory storage)');
 
-const uploadDir = process.env.RAILWAY_VOLUME_MOUNT_PATH ||
-                  process.env.UPLOAD_DIR ||
-                  './uploads';
-
-// Create directory with full write permissions
-if (!fs.existsSync(uploadDir)) {
-  try {
-    fs.mkdirSync(uploadDir, { recursive: true, mode: 0o777 });
-    logger.info(`Created upload directory: ${uploadDir} with permissions 777`);
-  } catch (error) {
-    logger.error(`Failed to create upload directory: ${error.message}`);
-    throw error;
-  }
-}
-
-// Verify write permissions
-try {
-  const testFile = path.join(uploadDir, '.write-test-' + Date.now());
-  fs.writeFileSync(testFile, 'test');
-  fs.unlinkSync(testFile);
-  logger.info(`Upload directory verified writable: ${uploadDir}`);
-} catch (error) {
-  logger.error(`Upload directory not writable: ${uploadDir} - ${error.message}`);
-  logger.error(`This will cause file upload failures!`);
-}
-
-logger.info(`Using upload directory: ${uploadDir}`);
-
-// Storage configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const timestamp = Date.now();
-    const sanitized = sanitizeFilename(file.originalname);
-    const filename = `${timestamp}-${sanitized}`;
-    cb(null, filename);
-  }
-});
+// Storage configuration - use memory storage for Vercel Blob
+// Files are stored in memory as Buffer objects, then uploaded to Vercel Blob
+const storage = multer.memoryStorage();
 
 // File filter
 const fileFilter = (req, file, cb) => {

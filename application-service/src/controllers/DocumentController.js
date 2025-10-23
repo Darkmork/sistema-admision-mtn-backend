@@ -4,6 +4,7 @@
  */
 
 const DocumentService = require('../services/DocumentService');
+const { uploadFile } = require('../services/VercelBlobService');
 const { ok, fail } = require('../utils/responseHelpers');
 const { VALID_DOCUMENT_TYPES } = require('../middleware/upload');
 const logger = require('../utils/logger');
@@ -37,12 +38,28 @@ class DocumentController {
       }
 
       const uploadedBy = req.user.userId;
-      const documents = await DocumentService.createDocuments(
-        files,
-        applicationId,
-        documentType,
-        uploadedBy
-      );
+
+      // Upload files to Vercel Blob and create database records
+      const documents = [];
+      for (const file of files) {
+        // Upload to Vercel Blob
+        const blobResult = await uploadFile(file.buffer, file.originalname, {
+          contentType: file.mimetype
+        });
+
+        // Create database record with Vercel Blob URL
+        const document = await DocumentService.createDocument({
+          applicationId,
+          documentType,
+          fileName: file.originalname,
+          filePath: blobResult.url,  // Vercel Blob URL
+          fileSize: blobResult.size,
+          mimeType: blobResult.contentType,
+          uploadedBy
+        });
+
+        documents.push(document);
+      }
 
       return res.status(201).json(
         ok({

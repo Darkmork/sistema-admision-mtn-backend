@@ -12,7 +12,38 @@ const path = require('path');
 
 class DocumentService {
   /**
-   * Create new document records
+   * Create single document record
+   */
+  async createDocument(data) {
+    return await writeOperationBreaker.fire(async () => {
+      const result = await dbPool.query(
+        `INSERT INTO documents (
+          application_id, document_type, file_name, file_path,
+          file_size, content_type, original_name, is_required, approval_status,
+          created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+        RETURNING *`,
+        [
+          data.applicationId,
+          data.documentType,
+          data.fileName,
+          data.filePath,  // Vercel Blob URL
+          data.fileSize,
+          data.mimeType,
+          data.fileName,
+          false,
+          'PENDING'
+        ]
+      );
+
+      logger.info(`Created document for application ${data.applicationId}: ${data.fileName}`);
+      return Document.fromDatabaseRow(result.rows[0]);
+    });
+  }
+
+  /**
+   * Create new document records (batch)
+   * @deprecated Use createDocument in loop instead for Vercel Blob
    */
   async createDocuments(files, applicationId, documentType, uploadedBy) {
     return await writeOperationBreaker.fire(async () => {
