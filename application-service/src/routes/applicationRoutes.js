@@ -655,4 +655,331 @@ router.delete(
   }
 );
 
+// ===========================
+// COMPLEMENTARY APPLICATION FORM ENDPOINTS
+// ===========================
+
+/**
+ * GET /api/applications/:id/complementary-form
+ * Get complementary form data for an application
+ */
+router.get('/:id/complementary-form', authenticate, async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.id);
+    const userId = req.user.userId;
+
+    // Verify application exists and user has access
+    const appCheckResult = await dbPool.query(
+      `SELECT a.id, a.applicant_user_id, a.status
+       FROM applications a
+       WHERE a.id = $1`,
+      [applicationId]
+    );
+
+    if (appCheckResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Postulación no encontrada'
+      });
+    }
+
+    const application = appCheckResult.rows[0];
+
+    // Check if user has access (either the applicant or an admin/coordinator)
+    const hasAccess =
+      application.applicant_user_id === userId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'COORDINATOR';
+
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permiso para acceder a este formulario'
+      });
+    }
+
+    // Get complementary form data
+    const formResult = await dbPool.query(
+      `SELECT
+        id,
+        application_id,
+        other_schools,
+        father_name,
+        father_education,
+        father_current_activity,
+        mother_name,
+        mother_education,
+        mother_current_activity,
+        application_reasons,
+        school_change_reason,
+        family_values,
+        faith_experiences,
+        community_service_experiences,
+        children_descriptions,
+        is_submitted,
+        submitted_at,
+        created_at,
+        updated_at
+      FROM complementary_application_forms
+      WHERE application_id = $1`,
+      [applicationId]
+    );
+
+    if (formResult.rows.length === 0) {
+      // No form exists yet - return 404 so frontend knows to create one
+      return res.status(404).json({
+        success: false,
+        error: 'Formulario complementario no encontrado',
+        message: 'No se ha creado un formulario complementario para esta aplicación'
+      });
+    }
+
+    const formData = formResult.rows[0];
+
+    // Transform snake_case to camelCase for frontend
+    res.json({
+      success: true,
+      data: {
+        id: formData.id,
+        applicationId: formData.application_id,
+        otherSchools: formData.other_schools,
+        fatherName: formData.father_name,
+        fatherEducation: formData.father_education,
+        fatherCurrentActivity: formData.father_current_activity,
+        motherName: formData.mother_name,
+        motherEducation: formData.mother_education,
+        motherCurrentActivity: formData.mother_current_activity,
+        applicationReasons: formData.application_reasons,
+        schoolChangeReason: formData.school_change_reason,
+        familyValues: formData.family_values,
+        faithExperiences: formData.faith_experiences,
+        communityServiceExperiences: formData.community_service_experiences,
+        childrenDescriptions: formData.children_descriptions,
+        isSubmitted: formData.is_submitted,
+        submittedAt: formData.submitted_at,
+        createdAt: formData.created_at,
+        updatedAt: formData.updated_at
+      }
+    });
+  } catch (error) {
+    console.error('Error getting complementary form:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener el formulario complementario',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * POST /api/applications/:id/complementary-form
+ * Save/update complementary form data for an application
+ */
+router.post('/:id/complementary-form', authenticate, validateCsrf, async (req, res) => {
+  try {
+    const applicationId = parseInt(req.params.id);
+    const userId = req.user.userId;
+
+    // Extract form data from request body
+    const {
+      otherSchools,
+      fatherName,
+      fatherEducation,
+      fatherCurrentActivity,
+      motherName,
+      motherEducation,
+      motherCurrentActivity,
+      applicationReasons,
+      schoolChangeReason,
+      familyValues,
+      faithExperiences,
+      communityServiceExperiences,
+      childrenDescriptions,
+      isSubmitted
+    } = req.body;
+
+    // Validate required fields
+    if (!applicationReasons || !familyValues) {
+      return res.status(400).json({
+        success: false,
+        error: 'Los campos de razones de postulación y valores familiares son obligatorios'
+      });
+    }
+
+    // Verify application exists and user has access
+    const appCheckResult = await dbPool.query(
+      `SELECT a.id, a.applicant_user_id, a.status
+       FROM applications a
+       WHERE a.id = $1`,
+      [applicationId]
+    );
+
+    if (appCheckResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Postulación no encontrada'
+      });
+    }
+
+    const application = appCheckResult.rows[0];
+
+    // Only the applicant can create/update their complementary form
+    if (application.applicant_user_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permiso para modificar este formulario'
+      });
+    }
+
+    // Check if complementary form already exists
+    const existingFormResult = await dbPool.query(
+      `SELECT id, is_submitted, submitted_at FROM complementary_application_forms WHERE application_id = $1`,
+      [applicationId]
+    );
+
+    // Prevent modification if form was already submitted
+    if (existingFormResult.rows.length > 0 && existingFormResult.rows[0].is_submitted) {
+      return res.status(403).json({
+        success: false,
+        error: 'Este formulario ya fue enviado y no puede ser modificado',
+        submittedAt: existingFormResult.rows[0].submitted_at
+      });
+    }
+
+    let formId;
+    let formData;
+    const submittedTimestamp = isSubmitted ? new Date() : null;
+
+    if (existingFormResult.rows.length === 0) {
+      // Insert new form
+      const insertResult = await dbPool.query(
+        `INSERT INTO complementary_application_forms (
+          application_id,
+          other_schools,
+          father_name,
+          father_education,
+          father_current_activity,
+          mother_name,
+          mother_education,
+          mother_current_activity,
+          application_reasons,
+          school_change_reason,
+          family_values,
+          faith_experiences,
+          community_service_experiences,
+          children_descriptions,
+          is_submitted,
+          submitted_at,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        RETURNING *`,
+        [
+          applicationId,
+          otherSchools || null,
+          fatherName || null,
+          fatherEducation || null,
+          fatherCurrentActivity || null,
+          motherName || null,
+          motherEducation || null,
+          motherCurrentActivity || null,
+          applicationReasons,
+          schoolChangeReason || null,
+          familyValues,
+          faithExperiences || null,
+          communityServiceExperiences || null,
+          childrenDescriptions ? JSON.stringify(childrenDescriptions) : null,
+          isSubmitted || false,
+          submittedTimestamp
+        ]
+      );
+
+      formData = insertResult.rows[0];
+      console.log(`Created complementary form ${formData.id} for application ${applicationId}`);
+    } else {
+      // Update existing form
+      formId = existingFormResult.rows[0].id;
+
+      const updateResult = await dbPool.query(
+        `UPDATE complementary_application_forms SET
+          other_schools = $1,
+          father_name = $2,
+          father_education = $3,
+          father_current_activity = $4,
+          mother_name = $5,
+          mother_education = $6,
+          mother_current_activity = $7,
+          application_reasons = $8,
+          school_change_reason = $9,
+          family_values = $10,
+          faith_experiences = $11,
+          community_service_experiences = $12,
+          children_descriptions = $13,
+          is_submitted = $14,
+          submitted_at = $15,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $16
+        RETURNING *`,
+        [
+          otherSchools || null,
+          fatherName || null,
+          fatherEducation || null,
+          fatherCurrentActivity || null,
+          motherName || null,
+          motherEducation || null,
+          motherCurrentActivity || null,
+          applicationReasons,
+          schoolChangeReason || null,
+          familyValues,
+          faithExperiences || null,
+          communityServiceExperiences || null,
+          childrenDescriptions ? JSON.stringify(childrenDescriptions) : null,
+          isSubmitted || false,
+          submittedTimestamp,
+          formId
+        ]
+      );
+
+      formData = updateResult.rows[0];
+      console.log(`Updated complementary form ${formId} for application ${applicationId}`);
+    }
+
+    // Transform snake_case to camelCase for frontend
+    res.json({
+      success: true,
+      message: isSubmitted
+        ? 'Formulario complementario enviado exitosamente'
+        : 'Formulario complementario guardado como borrador',
+      data: {
+        id: formData.id,
+        applicationId: formData.application_id,
+        otherSchools: formData.other_schools,
+        fatherName: formData.father_name,
+        fatherEducation: formData.father_education,
+        fatherCurrentActivity: formData.father_current_activity,
+        motherName: formData.mother_name,
+        motherEducation: formData.mother_education,
+        motherCurrentActivity: formData.mother_current_activity,
+        applicationReasons: formData.application_reasons,
+        schoolChangeReason: formData.school_change_reason,
+        familyValues: formData.family_values,
+        faithExperiences: formData.faith_experiences,
+        communityServiceExperiences: formData.community_service_experiences,
+        childrenDescriptions: formData.children_descriptions,
+        isSubmitted: formData.is_submitted,
+        submittedAt: formData.submitted_at,
+        createdAt: formData.created_at,
+        updatedAt: formData.updated_at
+      }
+    });
+  } catch (error) {
+    console.error('Error saving complementary form:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al guardar el formulario complementario',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 module.exports = router;
