@@ -114,8 +114,12 @@ class AuthService {
       );
 
       if (existingUserQuery.rows.length > 0) {
-        // Allow re-registration for test emails
-        if (email === 'test@example.com' || email === 'jorge.gangale@gmail.com') {
+        // Allow re-registration for test emails and @mtn.cl domain
+        const isTestEmail = email === 'test@example.com' ||
+                           email === 'jorge.gangale@gmail.com' ||
+                           email.endsWith('@mtn.cl');
+
+        if (isTestEmail) {
           await client.query('DELETE FROM users WHERE email = $1', [email.toLowerCase().trim()]);
         } else {
           throw new Error('Este email ya está registrado en el sistema');
