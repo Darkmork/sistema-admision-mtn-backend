@@ -283,7 +283,8 @@ router.get('/my-applications', authenticate, async (req, res) => {
               s.rut as student_rut, s.first_name as student_first_name,
               s.paternal_last_name as student_paternal_last_name,
               s.maternal_last_name as student_maternal_last_name,
-              s.grade_applied as grade_applied
+              s.grade_applied as grade_applied,
+              s.birth_date as birth_date
        FROM applications a
        LEFT JOIN students s ON a.student_id = s.id
        WHERE a.applicant_user_id = $1
@@ -293,10 +294,27 @@ router.get('/my-applications', authenticate, async (req, res) => {
 
     console.log(`Found ${result.rows.length} applications for user ${userId}`);
 
+    // Transform flat data to nested structure that frontend expects
+    const transformedApplications = result.rows.map(row => ({
+      id: row.id,
+      status: row.status,
+      submissionDate: row.submission_date,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      student: {
+        firstName: row.student_first_name,
+        lastName: row.student_paternal_last_name,
+        maternalLastName: row.student_maternal_last_name,
+        rut: row.student_rut,
+        gradeApplied: row.grade_applied,
+        birthDate: row.birth_date || null
+      }
+    }));
+
     res.json({
       success: true,
-      data: result.rows,
-      count: result.rows.length
+      data: transformedApplications,
+      count: transformedApplications.length
     });
   } catch (error) {
     console.error('Error getting my applications:', error);
