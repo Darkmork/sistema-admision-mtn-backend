@@ -94,22 +94,74 @@ const createApplicationSchema = Joi.object({
   additionalNotes: Joi.string().max(1000).optional().allow('')
 });
 
-// Application update schema (all fields optional)
+// Application update schema (accepts nested structure from frontend)
 const updateApplicationSchema = Joi.object({
-  studentFirstName: Joi.string().min(2).max(100),
-  studentPaternalLastName: Joi.string().min(2).max(100),
-  studentMaternalLastName: Joi.string().min(2).max(100),
-  studentRUT: Joi.string().custom(rutValidator, 'RUT validation'),
-  studentDateOfBirth: Joi.date().iso().max('now'),
-  studentGender: Joi.string().valid('M', 'F', 'OTHER'),
-  gradeAppliedFor: Joi.string().valid(
-    'PRE_KINDER', 'KINDER',
-    '1_BASICO', '2_BASICO', '3_BASICO', '4_BASICO', '5_BASICO', '6_BASICO', '7_BASICO', '8_BASICO',
-    '1_MEDIO', '2_MEDIO', '3_MEDIO', '4_MEDIO'
-  ),
-  guardianRUT: Joi.string().custom(rutValidator, 'RUT validation'),
-  guardianEmail: Joi.string().email(),
-  notes: Joi.string().max(1000)
+  // Nested student object
+  student: Joi.object({
+    firstName: Joi.string().min(2).max(100),
+    paternalLastName: Joi.string().min(2).max(100),
+    maternalLastName: Joi.string().min(2).max(100),
+    rut: Joi.string().custom(rutValidator, 'RUT validation'),
+    birthDate: Joi.date().iso().max('now'),
+    gender: Joi.string().valid('M', 'F', 'OTHER'),
+    email: Joi.string().email().allow('', null),
+    address: Joi.string().max(500).allow('', null),
+    gradeApplied: Joi.string().valid(
+      'PRE_KINDER', 'KINDER',
+      '1_BASICO', '2_BASICO', '3_BASICO', '4_BASICO', '5_BASICO', '6_BASICO', '7_BASICO', '8_BASICO',
+      '1_MEDIO', '2_MEDIO', '3_MEDIO', '4_MEDIO'
+    ),
+    currentSchool: Joi.string().max(200).allow('', null),
+    targetSchool: Joi.string().max(200).allow('', null),
+    additionalNotes: Joi.string().max(1000).allow('', null),
+    admissionPreference: Joi.string().allow('', null),
+    // Special categories
+    isEmployeeChild: Joi.boolean(),
+    employeeParentName: Joi.string().max(200).allow('', null),
+    isAlumniChild: Joi.boolean(),
+    alumniParentYear: Joi.number().integer().min(1900).max(2100).allow(null),
+    isInclusionStudent: Joi.boolean(),
+    inclusionType: Joi.string().max(100).allow('', null),
+    inclusionNotes: Joi.string().max(1000).allow('', null)
+  }),
+  // Nested father object
+  father: Joi.object({
+    fullName: Joi.string().min(2).max(200),
+    rut: Joi.string().custom(rutValidator, 'RUT validation'),
+    email: Joi.string().email(),
+    phone: Joi.string().max(20),
+    address: Joi.string().max(500),
+    profession: Joi.string().max(100)
+  }),
+  // Nested mother object
+  mother: Joi.object({
+    fullName: Joi.string().min(2).max(200),
+    rut: Joi.string().custom(rutValidator, 'RUT validation'),
+    email: Joi.string().email(),
+    phone: Joi.string().max(20),
+    address: Joi.string().max(500),
+    profession: Joi.string().max(100)
+  }),
+  // Nested guardian object
+  guardian: Joi.object({
+    fullName: Joi.string().min(2).max(200),
+    rut: Joi.string().custom(rutValidator, 'RUT validation'),
+    email: Joi.string().email(),
+    phone: Joi.string().max(20),
+    relationship: Joi.string().max(50)
+  }),
+  // Nested supporter object
+  supporter: Joi.object({
+    fullName: Joi.string().min(2).max(200),
+    rut: Joi.string().custom(rutValidator, 'RUT validation'),
+    email: Joi.string().email(),
+    phone: Joi.string().max(20),
+    relationship: Joi.string().max(50)
+  }),
+  // Top-level fields
+  schoolApplied: Joi.string().valid('MONTE_TABOR', 'NAZARET'),
+  status: Joi.string().valid('PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'WAITLISTED', 'WITHDRAWN'),
+  notes: Joi.string().max(1000).allow('', null)
 }).min(1);
 
 // Status update schema
