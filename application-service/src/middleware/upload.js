@@ -10,9 +10,9 @@ const { sanitizeFilename } = require('../utils/validations');
 const logger = require('../utils/logger');
 
 // Ensure upload directory exists
-// Railway: /app/uploads (mounted volume)
+// Railway: /app/uploads (mounted volume via RAILWAY_VOLUME_MOUNT_PATH)
 // Local: ./uploads (relative path)
-const uploadDir = process.env.UPLOAD_DIR || (process.env.NODE_ENV === 'production' ? '/app/uploads' : './uploads');
+const uploadDir = process.env.UPLOAD_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || (process.env.NODE_ENV === 'production' ? '/app/uploads' : './uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
   logger.info(`Created upload directory: ${uploadDir}`);
