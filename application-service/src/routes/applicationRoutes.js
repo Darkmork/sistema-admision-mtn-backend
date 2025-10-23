@@ -815,7 +815,7 @@ router.get('/:id/complementary-form', authenticate, async (req, res) => {
   }
 });
 
-/**
+// Save or update complementary form data (stored as JSONB)
 router.post('/:id/complementary-form', authenticate, validateCsrf, async (req, res) => {
   try {
     const applicationId = parseInt(req.params.id);
