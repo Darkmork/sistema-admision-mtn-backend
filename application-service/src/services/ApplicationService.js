@@ -55,8 +55,8 @@ class ApplicationService {
         FROM applications a
         LEFT JOIN students s ON a.student_id = s.id
         LEFT JOIN guardians g ON a.guardian_id = g.id
-        LEFT JOIN fathers f ON a.father_id = f.id
-        LEFT JOIN mothers m ON a.mother_id = m.id
+        LEFT JOIN parents f ON f.id = a.father_id AND f.parent_type = 'FATHER'
+        LEFT JOIN parents m ON m.id = a.mother_id AND m.parent_type = 'MOTHER'
         WHERE 1=1
       `;
       const params = [];
