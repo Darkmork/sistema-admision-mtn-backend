@@ -74,7 +74,8 @@ class ApplicationController {
         );
       }
 
-      return res.json(ok(application.toJSON()));
+      // appData already has the correct nested structure, no need for toJSON()
+      return res.json(ok(application));
     } catch (error) {
       logger.error(`Error getting application ${req.params.id}:`, error);
       return res.status(500).json(
