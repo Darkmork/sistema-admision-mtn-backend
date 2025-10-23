@@ -10,11 +10,14 @@ const { sanitizeFilename } = require('../utils/validations');
 const logger = require('../utils/logger');
 
 // Ensure upload directory exists
-const uploadDir = process.env.UPLOAD_DIR || './uploads';
+// Railway: /app/uploads (mounted volume)
+// Local: ./uploads (relative path)
+const uploadDir = process.env.UPLOAD_DIR || (process.env.NODE_ENV === 'production' ? '/app/uploads' : './uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
   logger.info(`Created upload directory: ${uploadDir}`);
 }
+logger.info(`Using upload directory: ${uploadDir}`);
 
 // Storage configuration
 const storage = multer.diskStorage({
