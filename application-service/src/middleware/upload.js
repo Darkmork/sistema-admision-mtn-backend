@@ -10,13 +10,42 @@ const { sanitizeFilename } = require('../utils/validations');
 const logger = require('../utils/logger');
 
 // Ensure upload directory exists
-// Railway: /app/uploads (mounted volume via RAILWAY_VOLUME_MOUNT_PATH)
+// Railway: /app/uploads/documents (subdirectory in mounted volume with write permissions)
 // Local: ./uploads (relative path)
-const uploadDir = process.env.UPLOAD_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || (process.env.NODE_ENV === 'production' ? '/app/uploads' : './uploads');
+
+// Base directory (volume mount point in Railway)
+const baseUploadDir = process.env.RAILWAY_VOLUME_MOUNT_PATH ||
+                       process.env.UPLOAD_DIR ||
+                       (process.env.NODE_ENV === 'production' ? '/app/uploads' : './uploads');
+
+// Use subdirectory 'documents' to ensure write permissions in Railway
+// Railway volumes have 755 permissions, but subdirectories created by the app are writable
+const uploadDir = process.env.RAILWAY_VOLUME_MOUNT_PATH
+  ? path.join(baseUploadDir, 'documents')  // Railway: use subdirectory
+  : baseUploadDir;                          // Local: use base dir directly
+
+// Create directory with full write permissions
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-  logger.info(`Created upload directory: ${uploadDir}`);
+  try {
+    fs.mkdirSync(uploadDir, { recursive: true, mode: 0o777 });
+    logger.info(`Created upload directory: ${uploadDir} with permissions 777`);
+  } catch (error) {
+    logger.error(`Failed to create upload directory: ${error.message}`);
+    throw error;
+  }
 }
+
+// Verify write permissions
+try {
+  const testFile = path.join(uploadDir, '.write-test-' + Date.now());
+  fs.writeFileSync(testFile, 'test');
+  fs.unlinkSync(testFile);
+  logger.info(`Upload directory verified writable: ${uploadDir}`);
+} catch (error) {
+  logger.error(`Upload directory not writable: ${uploadDir} - ${error.message}`);
+  logger.error(`This will cause file upload failures!`);
+}
+
 logger.info(`Using upload directory: ${uploadDir}`);
 
 // Storage configuration
