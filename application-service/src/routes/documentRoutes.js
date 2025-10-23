@@ -21,7 +21,7 @@ router.post(
 
 // Get documents by application ID
 router.get(
-  '/:applicationId/documents',
+  '/application/:applicationId',
   authenticate,
   DocumentController.getDocumentsByApplicationId.bind(DocumentController)
 );
