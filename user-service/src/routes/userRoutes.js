@@ -44,6 +44,7 @@ router.get('/public/school-staff', async (req, res) => {
       rut: user.rut,
       phone: user.phone,
       active: user.active,
+      emailVerified: user.emailVerified,
       canInterview: ['TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
     }));
 
