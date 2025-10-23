@@ -458,7 +458,46 @@ class ApplicationService {
    */
   async updateApplication(id, updateData) {
     return await writeOperationBreaker.fire(async () => {
-      const app = new Application(updateData);
+      // Transform nested frontend structure to flat structure for Application model
+      const flatData = {};
+
+      // Handle nested student data
+      if (updateData.student) {
+        flatData.studentFirstName = updateData.student.firstName;
+        flatData.studentPaternalLastName = updateData.student.paternalLastName;
+        flatData.studentMaternalLastName = updateData.student.maternalLastName;
+        flatData.studentRUT = updateData.student.rut;
+        flatData.studentDateOfBirth = updateData.student.birthDate;
+        flatData.studentGender = updateData.student.gender;
+        flatData.studentEmail = updateData.student.email;
+        flatData.studentAddress = updateData.student.address;
+        flatData.gradeAppliedFor = updateData.student.gradeApplied;
+        flatData.currentSchool = updateData.student.currentSchool;
+        flatData.targetSchool = updateData.student.targetSchool;
+
+        // Special categories
+        flatData.isEmployeeChild = updateData.student.isEmployeeChild;
+        flatData.employeeParentName = updateData.student.employeeParentName;
+        flatData.isAlumniChild = updateData.student.isAlumniChild;
+        flatData.alumniParentYear = updateData.student.alumniParentYear;
+        flatData.isInclusionStudent = updateData.student.isInclusionStudent;
+        flatData.inclusionType = updateData.student.inclusionType;
+        flatData.inclusionNotes = updateData.student.inclusionNotes;
+      }
+
+      // Handle top-level fields
+      if (updateData.status) flatData.status = updateData.status;
+      if (updateData.notes) flatData.notes = updateData.notes;
+      if (updateData.applicationYear) flatData.applicationYear = updateData.applicationYear;
+      if (updateData.schoolApplied) flatData.targetSchool = updateData.schoolApplied;
+
+      // Handle guardian data (if updating guardian info)
+      if (updateData.guardian) {
+        flatData.guardianRUT = updateData.guardian.rut;
+        flatData.guardianEmail = updateData.guardian.email;
+      }
+
+      const app = new Application(flatData);
       const dbData = app.toDatabase();
 
       const fields = [];
