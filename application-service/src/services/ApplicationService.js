@@ -17,16 +17,46 @@ class ApplicationService {
       const { status, applicationYear, guardianRUT } = filters;
       const offset = page * limit;
 
-      // Include student data with LEFT JOIN
+      // Include student, guardian, father, and mother data with LEFT JOIN
       let query = `
         SELECT a.*,
                s.rut as student_rut,
                s.first_name as student_first_name,
                s.paternal_last_name as student_paternal_last_name,
                s.maternal_last_name as student_maternal_last_name,
-               s.grade_applied as student_grade_applied
+               s.grade_applied as student_grade_applied,
+
+               -- Guardian information
+               g.id as guardian_id,
+               g.full_name as guardian_name,
+               g.rut as guardian_rut_detail,
+               g.email as guardian_email,
+               g.phone as guardian_phone,
+               g.relationship as guardian_relationship,
+               g.profession as guardian_profession,
+
+               -- Father information
+               f.id as father_id,
+               f.full_name as father_name,
+               f.rut as father_rut,
+               f.email as father_email,
+               f.phone as father_phone,
+               f.address as father_address,
+               f.profession as father_profession,
+
+               -- Mother information
+               m.id as mother_id,
+               m.full_name as mother_name,
+               m.rut as mother_rut,
+               m.email as mother_email,
+               m.phone as mother_phone,
+               m.address as mother_address,
+               m.profession as mother_profession
         FROM applications a
         LEFT JOIN students s ON a.student_id = s.id
+        LEFT JOIN guardians g ON a.guardian_id = g.id
+        LEFT JOIN fathers f ON a.father_id = f.id
+        LEFT JOIN mothers m ON a.mother_id = m.id
         WHERE 1=1
       `;
       const params = [];
