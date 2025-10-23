@@ -108,8 +108,49 @@ class ApplicationService {
 
       logger.info(`Retrieved ${result.rows.length} applications (page ${page}, total ${total})`);
 
+      // Transform each row to include guardian, father, and mother objects
+      // similar to how getApplicationById() does it
+      const transformedRows = result.rows.map(row => {
+        return {
+          ...row,
+          // Build guardians array from flattened columns
+          guardians: row.guardian_id ? [{
+            id: row.guardian_id,
+            full_name: row.guardian_name,
+            rut: row.guardian_rut_detail,
+            email: row.guardian_email,
+            phone: row.guardian_phone,
+            relationship: row.guardian_relationship,
+            profession: row.guardian_profession
+          }] : [],
+          // Build parents array from flattened columns
+          parents: [
+            ...(row.father_id ? [{
+              id: row.father_id,
+              full_name: row.father_name,
+              rut: row.father_rut,
+              email: row.father_email,
+              phone: row.father_phone,
+              profession: row.father_profession,
+              address: row.father_address,
+              parent_type: 'FATHER'
+            }] : []),
+            ...(row.mother_id ? [{
+              id: row.mother_id,
+              full_name: row.mother_name,
+              rut: row.mother_rut,
+              email: row.mother_email,
+              phone: row.mother_phone,
+              profession: row.mother_profession,
+              address: row.mother_address,
+              parent_type: 'MOTHER'
+            }] : [])
+          ]
+        };
+      });
+
       return {
-        applications: Application.fromDatabaseRows(result.rows),
+        applications: Application.fromDatabaseRows(transformedRows),
         total,
         page,
         limit
