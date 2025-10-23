@@ -50,7 +50,9 @@ router.get('/public/school-staff', async (req, res) => {
     res.json({
       success: true,
       data: staffUsers,
-      count: staffUsers.length
+      content: staffUsers,  // Frontend expects 'content' field
+      count: staffUsers.length,
+      totalElements: staffUsers.length
     });
   } catch (error) {
     res.status(500).json({
