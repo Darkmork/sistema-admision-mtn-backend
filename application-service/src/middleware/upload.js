@@ -10,12 +10,15 @@ const { sanitizeFilename } = require('../utils/validations');
 const logger = require('../utils/logger');
 
 // Ensure upload directory exists
-// Railway: Use /tmp/uploads (always writable) since volume has permission issues
+// Railway: Use RAILWAY_VOLUME_MOUNT_PATH (persistent storage)
 // Local: ./uploads (relative path)
+//
+// IMPORTANT: Railway Volume permissions must be set in Start Command:
+//   mkdir -p $RAILWAY_VOLUME_MOUNT_PATH && chmod -R 777 $RAILWAY_VOLUME_MOUNT_PATH && node src/server.js
 
-const uploadDir = process.env.RAILWAY_VOLUME_MOUNT_PATH
-  ? '/tmp/uploads'  // Railway: use /tmp which is always writable
-  : (process.env.UPLOAD_DIR || './uploads');  // Local: use configured or default path
+const uploadDir = process.env.RAILWAY_VOLUME_MOUNT_PATH ||
+                  process.env.UPLOAD_DIR ||
+                  './uploads';
 
 // Create directory with full write permissions
 if (!fs.existsSync(uploadDir)) {
