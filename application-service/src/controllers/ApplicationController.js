@@ -89,7 +89,9 @@ class ApplicationController {
    */
   async createApplication(req, res) {
     try {
-      const application = await ApplicationService.createApplication(req.body);
+      // Pass userId from JWT to service so we know who created the application
+      const userId = req.user?.userId;
+      const application = await ApplicationService.createApplication(req.body, userId);
 
       // Invalidate all cached application lists
       const invalidated = req.applicationCache.invalidatePattern('applications:list:*');

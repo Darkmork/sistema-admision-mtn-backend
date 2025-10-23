@@ -280,8 +280,10 @@ class ApplicationService {
 
   /**
    * Create new application
+   * @param {Object} applicationData - Application data from request
+   * @param {number} userId - ID of the user creating the application (from JWT)
    */
-  async createApplication(applicationData) {
+  async createApplication(applicationData, userId = null) {
     return await writeOperationBreaker.fire(async () => {
       // The applications table uses foreign keys to students, parents, guardians, supporters
       // We need to create those records first, then link them in applications table
@@ -422,8 +424,8 @@ class ApplicationService {
       const appResult = await dbPool.query(
         `INSERT INTO applications (
           student_id, father_id, mother_id, guardian_id, supporter_id,
-          status, submission_date, created_at, updated_at, additional_notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), NOW(), $7)
+          applicant_user_id, status, submission_date, created_at, updated_at, additional_notes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW(), NOW(), $8)
         RETURNING *`,
         [
           studentId,
@@ -431,12 +433,13 @@ class ApplicationService {
           motherId,
           guardianId,
           supporterId,
+          userId, // Store who created this application
           'PENDING',
           applicationData.additionalNotes || ''
         ]
       );
 
-      logger.info(`Created application ${appResult.rows[0].id} with student ${studentId}, father ${fatherId}, mother ${motherId}, guardian ${guardianId}, supporter ${supporterId}`);
+      logger.info(`Created application ${appResult.rows[0].id} with student ${studentId}, father ${fatherId}, mother ${motherId}, guardian ${guardianId}, supporter ${supporterId}, applicant_user_id ${userId}`);
 
       // Return simple object with just the ID - frontend only needs this for document upload
       // Full application data can be fetched with getApplicationById if needed
