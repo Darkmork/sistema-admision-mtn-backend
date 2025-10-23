@@ -20,7 +20,7 @@ router.get('/public/school-staff', async (req, res) => {
 
     let query = `
       SELECT id, first_name as "firstName", last_name as "lastName", email, role,
-             subject, rut, phone, active
+             subject, rut, phone, active, email_verified as "emailVerified"
       FROM users
       WHERE role IN ('ADMIN', 'TEACHER', 'COORDINATOR', 'CYCLE_DIRECTOR', 'PSYCHOLOGIST')
     `;
