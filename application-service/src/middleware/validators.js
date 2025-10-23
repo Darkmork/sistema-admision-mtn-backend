@@ -194,6 +194,12 @@ const validate = (schema, property = 'body') => {
         message: detail.message
       }));
 
+      // LOG DETALLADO PARA DEBUG
+      console.log('=== VALIDATION ERROR DEBUG ===');
+      console.log('Request body:', JSON.stringify(req[property], null, 2));
+      console.log('Validation errors:', JSON.stringify(details, null, 2));
+      console.log('==============================');
+
       return res.status(400).json(
         fail('VALIDATION_ERROR', 'Request validation failed', details)
       );
