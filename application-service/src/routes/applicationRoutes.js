@@ -676,12 +676,12 @@ router.get('/:id/documents', authenticate, async (req, res) => {
         d.original_name,
         d.file_path,
         d.file_size,
-        d.mime_type,
+        d.content_type,
         d.is_required,
         d.approval_status,
         d.rejection_reason,
-        d.uploaded_by,
         d.approved_by,
+        d.approval_date,
         d.created_at,
         d.updated_at
       FROM documents d
@@ -698,12 +698,12 @@ router.get('/:id/documents', authenticate, async (req, res) => {
       originalName: doc.original_name,
       filePath: doc.file_path,
       fileSize: doc.file_size,
-      mimeType: doc.mime_type,
+      contentType: doc.content_type,
       isRequired: doc.is_required,
       approvalStatus: doc.approval_status,
       rejectionReason: doc.rejection_reason,
-      uploadedBy: doc.uploaded_by,
       approvedBy: doc.approved_by,
+      approvalDate: doc.approval_date,
       uploadDate: doc.created_at,
       updatedAt: doc.updated_at
     }));
