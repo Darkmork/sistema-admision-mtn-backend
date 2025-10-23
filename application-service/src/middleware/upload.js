@@ -10,19 +10,12 @@ const { sanitizeFilename } = require('../utils/validations');
 const logger = require('../utils/logger');
 
 // Ensure upload directory exists
-// Railway: /app/uploads/documents (subdirectory in mounted volume with write permissions)
+// Railway: Use /tmp/uploads (always writable) since volume has permission issues
 // Local: ./uploads (relative path)
 
-// Base directory (volume mount point in Railway)
-const baseUploadDir = process.env.RAILWAY_VOLUME_MOUNT_PATH ||
-                       process.env.UPLOAD_DIR ||
-                       (process.env.NODE_ENV === 'production' ? '/app/uploads' : './uploads');
-
-// Use subdirectory 'documents' to ensure write permissions in Railway
-// Railway volumes have 755 permissions, but subdirectories created by the app are writable
 const uploadDir = process.env.RAILWAY_VOLUME_MOUNT_PATH
-  ? path.join(baseUploadDir, 'documents')  // Railway: use subdirectory
-  : baseUploadDir;                          // Local: use base dir directly
+  ? '/tmp/uploads'  // Railway: use /tmp which is always writable
+  : (process.env.UPLOAD_DIR || './uploads');  // Local: use configured or default path
 
 // Create directory with full write permissions
 if (!fs.existsSync(uploadDir)) {
