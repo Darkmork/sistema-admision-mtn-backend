@@ -429,7 +429,7 @@ app.use('/api/interviews', makeProxy(SERVICES.EVALUATION_SERVICE, '/api/intervie
 // Proxy para Notification Service - /api/notifications, /api/email, /api/institutional-emails
 app.use('/api/notifications', makeProxy(SERVICES.NOTIFICATION_SERVICE, '/api/notifications'));
 app.use('/api/email', makeProxy(SERVICES.NOTIFICATION_SERVICE, '/api/email'));
-app.use('/api/institutional-emails', makeProxy(SERVICES.NOTIFICATION_SERVICE, '/api/institutional-emails'));
+app.use('/api/institutional-emails', makeProxy(SERVICES.NOTIFICATION_SERVICE, '/api/institutional-emails')); // Document review notifications
 
 // Proxy para Dashboard Service - /api/dashboard, /api/analytics
 app.use('/api/dashboard', makeProxy(SERVICES.DASHBOARD_SERVICE, '/api/dashboard'));
