@@ -98,6 +98,31 @@ class EvaluationController {
       return res.status(500).json(fail('EVAL_009', 'Failed to retrieve evaluations', error.message));
     }
   }
+
+  async getMyEvaluations(req, res) {
+    try {
+      const evaluatorId = req.user.userId;
+      const { page: pageNum = 0, limit = 10, status, evaluationType } = req.query;
+
+      const filters = {
+        evaluatorId: parseInt(evaluatorId),
+        ...(status && { status }),
+        ...(evaluationType && { evaluationType })
+      };
+
+      const result = await EvaluationService.getAllEvaluations(filters, parseInt(pageNum), parseInt(limit));
+
+      return res.json(page(
+        result.evaluations.map(e => e.toJSON()),
+        result.total,
+        result.page,
+        result.limit
+      ));
+    } catch (error) {
+      logger.error('Error getting my evaluations:', error);
+      return res.status(500).json(fail('EVAL_010', 'Failed to retrieve my evaluations', error.message));
+    }
+  }
 }
 
 module.exports = new EvaluationController();

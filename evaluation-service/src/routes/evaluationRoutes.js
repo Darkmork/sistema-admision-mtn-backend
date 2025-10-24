@@ -288,6 +288,9 @@ router.get('/subject/:subject', authenticate, async (req, res) => {
   }
 });
 
+// Get my evaluations (must be before /:id route)
+router.get('/my-evaluations', authenticate, EvaluationController.getMyEvaluations.bind(EvaluationController));
+
 router.get('/:id', authenticate, EvaluationController.getEvaluationById.bind(EvaluationController));
 
 router.post(
