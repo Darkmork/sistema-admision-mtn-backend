@@ -528,79 +528,208 @@ class ApplicationService {
 
   /**
    * Update application
+   * Note: Applications table only stores references (student_id, guardian_id, etc.)
+   * This method updates the related tables (students, guardians, etc.)
    */
   async updateApplication(id, updateData) {
     return await writeOperationBreaker.fire(async () => {
-      // Transform nested frontend structure to flat structure for Application model
-      const flatData = {};
+      // First, get the current application to find related IDs
+      const appResult = await dbPool.query(
+        'SELECT * FROM applications WHERE id = $1',
+        [id]
+      );
 
-      // Handle nested student data
-      if (updateData.student) {
-        flatData.studentFirstName = updateData.student.firstName;
-        flatData.studentPaternalLastName = updateData.student.paternalLastName;
-        flatData.studentMaternalLastName = updateData.student.maternalLastName;
-        flatData.studentRUT = updateData.student.rut;
-        flatData.studentDateOfBirth = updateData.student.birthDate;
-        flatData.studentGender = updateData.student.gender;
-        flatData.studentEmail = updateData.student.email;
-        flatData.studentAddress = updateData.student.address;
-        flatData.gradeAppliedFor = updateData.student.gradeApplied;
-        flatData.currentSchool = updateData.student.currentSchool;
-        flatData.targetSchool = updateData.student.targetSchool;
-
-        // Special categories
-        flatData.isEmployeeChild = updateData.student.isEmployeeChild;
-        flatData.employeeParentName = updateData.student.employeeParentName;
-        flatData.isAlumniChild = updateData.student.isAlumniChild;
-        flatData.alumniParentYear = updateData.student.alumniParentYear;
-        flatData.isInclusionStudent = updateData.student.isInclusionStudent;
-        flatData.inclusionType = updateData.student.inclusionType;
-        flatData.inclusionNotes = updateData.student.inclusionNotes;
-      }
-
-      // Handle top-level fields
-      if (updateData.status) flatData.status = updateData.status;
-      if (updateData.notes) flatData.notes = updateData.notes;
-      if (updateData.applicationYear) flatData.applicationYear = updateData.applicationYear;
-      if (updateData.schoolApplied) flatData.targetSchool = updateData.schoolApplied;
-
-      // Handle guardian data (if updating guardian info)
-      if (updateData.guardian) {
-        flatData.guardianRUT = updateData.guardian.rut;
-        flatData.guardianEmail = updateData.guardian.email;
-      }
-
-      const app = new Application(flatData);
-      const dbData = app.toDatabase();
-
-      const fields = [];
-      const values = [];
-      let paramIndex = 1;
-
-      Object.keys(dbData).forEach(key => {
-        if (dbData[key] !== undefined && dbData[key] !== null) {
-          fields.push(`${key} = $${paramIndex++}`);
-          values.push(dbData[key]);
-        }
-      });
-
-      if (fields.length === 0) {
-        throw new Error('No fields to update');
-      }
-
-      fields.push(`updated_at = NOW()`);
-      values.push(id);
-
-      const query = `UPDATE applications SET ${fields.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
-
-      const result = await dbPool.query(query, values);
-
-      if (result.rows.length === 0) {
+      if (appResult.rows.length === 0) {
         return null;
       }
 
-      logger.info(`Updated application ${id}`);
-      return Application.fromDatabaseRow(result.rows[0]);
+      const application = appResult.rows[0];
+      const studentId = application.student_id;
+      const guardianId = application.guardian_id;
+      const fatherId = application.father_id;
+      const motherId = application.mother_id;
+
+      // Update student table if student data is provided
+      if (updateData.student && studentId) {
+        const studentFields = [];
+        const studentValues = [];
+        let studentParamIndex = 1;
+
+        if (updateData.student.firstName !== undefined) {
+          studentFields.push(`first_name = $${studentParamIndex++}`);
+          studentValues.push(updateData.student.firstName);
+        }
+        if (updateData.student.paternalLastName !== undefined) {
+          studentFields.push(`paternal_last_name = $${studentParamIndex++}`);
+          studentValues.push(updateData.student.paternalLastName);
+        }
+        if (updateData.student.maternalLastName !== undefined) {
+          studentFields.push(`maternal_last_name = $${studentParamIndex++}`);
+          studentValues.push(updateData.student.maternalLastName);
+        }
+        if (updateData.student.rut !== undefined) {
+          studentFields.push(`rut = $${studentParamIndex++}`);
+          studentValues.push(updateData.student.rut);
+        }
+        if (updateData.student.birthDate !== undefined) {
+          studentFields.push(`birth_date = $${studentParamIndex++}`);
+          studentValues.push(updateData.student.birthDate);
+        }
+        if (updateData.student.email !== undefined) {
+          studentFields.push(`email = $${studentParamIndex++}`);
+          studentValues.push(updateData.student.email);
+        }
+        if (updateData.student.address !== undefined) {
+          studentFields.push(`address = $${studentParamIndex++}`);
+          studentValues.push(updateData.student.address);
+        }
+        if (updateData.student.gradeApplied !== undefined) {
+          studentFields.push(`grade_applied = $${studentParamIndex++}`);
+          studentValues.push(updateData.student.gradeApplied);
+        }
+        if (updateData.student.currentSchool !== undefined) {
+          studentFields.push(`current_school = $${studentParamIndex++}`);
+          studentValues.push(updateData.student.currentSchool);
+        }
+
+        if (studentFields.length > 0) {
+          studentFields.push(`updated_at = NOW()`);
+          studentValues.push(studentId);
+
+          const studentQuery = `UPDATE students SET ${studentFields.join(', ')} WHERE id = $${studentParamIndex} RETURNING *`;
+          await dbPool.query(studentQuery, studentValues);
+          logger.info(`Updated student ${studentId} for application ${id}`);
+        }
+      }
+
+      // Update guardian table if guardian data is provided
+      if (updateData.guardian && guardianId) {
+        const guardianFields = [];
+        const guardianValues = [];
+        let guardianParamIndex = 1;
+
+        if (updateData.guardian.fullName !== undefined) {
+          guardianFields.push(`full_name = $${guardianParamIndex++}`);
+          guardianValues.push(updateData.guardian.fullName);
+        }
+        if (updateData.guardian.rut !== undefined) {
+          guardianFields.push(`rut = $${guardianParamIndex++}`);
+          guardianValues.push(updateData.guardian.rut);
+        }
+        if (updateData.guardian.email !== undefined) {
+          guardianFields.push(`email = $${guardianParamIndex++}`);
+          guardianValues.push(updateData.guardian.email);
+        }
+        if (updateData.guardian.phone !== undefined) {
+          guardianFields.push(`phone = $${guardianParamIndex++}`);
+          guardianValues.push(updateData.guardian.phone);
+        }
+        if (updateData.guardian.relationship !== undefined) {
+          guardianFields.push(`relationship = $${guardianParamIndex++}`);
+          guardianValues.push(updateData.guardian.relationship);
+        }
+
+        if (guardianFields.length > 0) {
+          guardianFields.push(`updated_at = NOW()`);
+          guardianValues.push(guardianId);
+
+          const guardianQuery = `UPDATE guardians SET ${guardianFields.join(', ')} WHERE id = $${guardianParamIndex} RETURNING *`;
+          await dbPool.query(guardianQuery, guardianValues);
+          logger.info(`Updated guardian ${guardianId} for application ${id}`);
+        }
+      }
+
+      // Update father table if father data is provided
+      if (updateData.father && fatherId) {
+        const fatherFields = [];
+        const fatherValues = [];
+        let fatherParamIndex = 1;
+
+        if (updateData.father.fullName !== undefined) {
+          fatherFields.push(`full_name = $${fatherParamIndex++}`);
+          fatherValues.push(updateData.father.fullName);
+        }
+        if (updateData.father.rut !== undefined) {
+          fatherFields.push(`rut = $${fatherParamIndex++}`);
+          fatherValues.push(updateData.father.rut);
+        }
+        if (updateData.father.email !== undefined) {
+          fatherFields.push(`email = $${fatherParamIndex++}`);
+          fatherValues.push(updateData.father.email);
+        }
+        if (updateData.father.phone !== undefined) {
+          fatherFields.push(`phone = $${fatherParamIndex++}`);
+          fatherValues.push(updateData.father.phone);
+        }
+
+        if (fatherFields.length > 0) {
+          fatherFields.push(`updated_at = NOW()`);
+          fatherValues.push(fatherId);
+
+          const fatherQuery = `UPDATE parents SET ${fatherFields.join(', ')} WHERE id = $${fatherParamIndex} RETURNING *`;
+          await dbPool.query(fatherQuery, fatherValues);
+          logger.info(`Updated father ${fatherId} for application ${id}`);
+        }
+      }
+
+      // Update mother table if mother data is provided
+      if (updateData.mother && motherId) {
+        const motherFields = [];
+        const motherValues = [];
+        let motherParamIndex = 1;
+
+        if (updateData.mother.fullName !== undefined) {
+          motherFields.push(`full_name = $${motherParamIndex++}`);
+          motherValues.push(updateData.mother.fullName);
+        }
+        if (updateData.mother.rut !== undefined) {
+          motherFields.push(`rut = $${motherParamIndex++}`);
+          motherValues.push(updateData.mother.rut);
+        }
+        if (updateData.mother.email !== undefined) {
+          motherFields.push(`email = $${motherParamIndex++}`);
+          motherValues.push(updateData.mother.email);
+        }
+        if (updateData.mother.phone !== undefined) {
+          motherFields.push(`phone = $${motherParamIndex++}`);
+          motherValues.push(updateData.mother.phone);
+        }
+
+        if (motherFields.length > 0) {
+          motherFields.push(`updated_at = NOW()`);
+          motherValues.push(motherId);
+
+          const motherQuery = `UPDATE parents SET ${motherFields.join(', ')} WHERE id = $${motherParamIndex} RETURNING *`;
+          await dbPool.query(motherQuery, motherValues);
+          logger.info(`Updated mother ${motherId} for application ${id}`);
+        }
+      }
+
+      // Update application table (only fields that exist in applications table)
+      const appFields = [];
+      const appValues = [];
+      let appParamIndex = 1;
+
+      if (updateData.status !== undefined) {
+        appFields.push(`status = $${appParamIndex++}`);
+        appValues.push(updateData.status);
+      }
+      if (updateData.notes !== undefined) {
+        appFields.push(`additional_notes = $${appParamIndex++}`);
+        appValues.push(updateData.notes);
+      }
+
+      if (appFields.length > 0) {
+        appFields.push(`updated_at = NOW()`);
+        appValues.push(id);
+
+        const appQuery = `UPDATE applications SET ${appFields.join(', ')} WHERE id = $${appParamIndex} RETURNING *`;
+        await dbPool.query(appQuery, appValues);
+        logger.info(`Updated application ${id} metadata`);
+      }
+
+      // Return the updated application with all related data
+      return await this.getApplicationById(id);
     });
   }
 
