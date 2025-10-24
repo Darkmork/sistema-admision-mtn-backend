@@ -167,6 +167,71 @@ class DocumentController {
   }
 
   /**
+   * PUT /api/documents/:id
+   * Replace document file - uploads new file to Vercel Blob and deletes old one
+   */
+  async replaceDocument(req, res) {
+    try {
+      const { id } = req.params;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json(
+          fail('DOC_017', 'No file uploaded')
+        );
+      }
+
+      // Get existing document
+      const existingDocument = await DocumentService.getDocumentById(id);
+
+      if (!existingDocument) {
+        return res.status(404).json(
+          fail('DOC_018', `Document ${id} not found`)
+        );
+      }
+
+      const oldBlobUrl = existingDocument.filePath;
+
+      // Upload new file to Vercel Blob
+      const blobResult = await uploadFile(file.buffer, file.originalname, {
+        contentType: file.mimetype
+      });
+
+      // Update database with new file info
+      const updatedDocument = await DocumentService.updateDocument(id, {
+        fileName: file.originalname,
+        filePath: blobResult.url,
+        fileSize: blobResult.size,
+        mimeType: blobResult.contentType
+      });
+
+      // Delete old file from Vercel Blob (if it was a blob URL)
+      if (oldBlobUrl && oldBlobUrl.startsWith('http')) {
+        try {
+          await deleteFile(oldBlobUrl);
+          logger.info(`Deleted old file from Vercel Blob: ${oldBlobUrl}`);
+        } catch (blobError) {
+          // Log error but don't fail the request since new file is already uploaded
+          logger.error(`Failed to delete old file from Vercel Blob: ${oldBlobUrl}`, blobError);
+          logger.warn('New document uploaded but old file may remain in blob storage');
+        }
+      }
+
+      return res.json(
+        ok({
+          message: 'Document replaced successfully',
+          document: updatedDocument.toJSON()
+        })
+      );
+    } catch (error) {
+      logger.error(`Error replacing document ${req.params.id}:`, error);
+      return res.status(500).json(
+        fail('DOC_019', 'Failed to replace document', error.message)
+      );
+    }
+  }
+
+  /**
    * PUT /api/applications/documents/:id/approval
    */
   async updateDocumentApproval(req, res) {

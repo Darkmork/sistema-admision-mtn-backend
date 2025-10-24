@@ -40,6 +40,15 @@ router.get(
   DocumentController.viewDocument.bind(DocumentController)
 );
 
+// Replace/update document file
+router.put(
+  '/:id',
+  authenticate,
+  validateCsrf,
+  upload.single('file'),
+  DocumentController.replaceDocument.bind(DocumentController)
+);
+
 // Update document approval status
 router.put(
   '/:id/approval',

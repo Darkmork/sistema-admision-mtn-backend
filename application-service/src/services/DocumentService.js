@@ -135,6 +135,53 @@ class DocumentService {
   }
 
   /**
+   * Update document file metadata (for file replacement)
+   */
+  async updateDocument(id, updateData) {
+    return await writeOperationBreaker.fire(async () => {
+      const fields = [];
+      const values = [];
+      let paramIndex = 1;
+
+      // Build dynamic UPDATE query based on provided fields
+      if (updateData.fileName !== undefined) {
+        fields.push(`file_name = $${paramIndex++}`);
+        values.push(updateData.fileName);
+      }
+      if (updateData.filePath !== undefined) {
+        fields.push(`file_path = $${paramIndex++}`);
+        values.push(updateData.filePath);
+      }
+      if (updateData.fileSize !== undefined) {
+        fields.push(`file_size = $${paramIndex++}`);
+        values.push(updateData.fileSize);
+      }
+      if (updateData.mimeType !== undefined) {
+        fields.push(`mime_type = $${paramIndex++}`);
+        values.push(updateData.mimeType);
+      }
+
+      if (fields.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      // Add updated_at timestamp
+      fields.push(`updated_at = NOW()`);
+      values.push(id);
+
+      const query = `UPDATE documents SET ${fields.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
+      const result = await dbPool.query(query, values);
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      logger.info(`Updated document ${id} file metadata`);
+      return Document.fromDatabaseRow(result.rows[0]);
+    });
+  }
+
+  /**
    * Delete document
    */
   async deleteDocument(id) {
