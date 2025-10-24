@@ -4,6 +4,7 @@ const { fail } = require('../utils/responseHelpers');
 // Evaluation creation schema
 const createEvaluationSchema = Joi.object({
   applicationId: Joi.number().integer().positive().required(),
+  evaluatorId: Joi.number().integer().positive().optional(), // Optional: can be provided by admin or use req.user.userId
   evaluationType: Joi.string().valid(
     'LANGUAGE_EXAM', 'MATHEMATICS_EXAM', 'ENGLISH_EXAM',
     'CYCLE_DIRECTOR_REPORT', 'CYCLE_DIRECTOR_INTERVIEW', 'PSYCHOLOGICAL_INTERVIEW'
