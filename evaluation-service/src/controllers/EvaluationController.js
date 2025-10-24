@@ -54,6 +54,12 @@ class EvaluationController {
       return res.status(201).json(ok(evaluation.toJSON()));
     } catch (error) {
       logger.error('Error creating evaluation:', error);
+
+      // Si el error es por duplicado, retornar 409 Conflict
+      if (error.message.includes('Ya existe una evaluación')) {
+        return res.status(409).json(fail('EVAL_DUPLICATE', 'Duplicate evaluation', error.message));
+      }
+
       return res.status(500).json(fail('EVAL_004', 'Failed to create evaluation', error.message));
     }
   }
