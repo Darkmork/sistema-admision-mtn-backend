@@ -11,11 +11,12 @@ const createEvaluationSchema = Joi.object({
   ).required(),
   score: Joi.number().min(0).required(),
   maxScore: Joi.number().min(1).required(),
+  status: Joi.string().valid('PENDING', 'IN_PROGRESS', 'COMPLETED').optional(), // Optional status
   strengths: Joi.string().max(1000).allow('', null),
   areasForImprovement: Joi.string().max(1000).allow('', null),
   observations: Joi.string().max(2000).allow('', null),
   recommendations: Joi.string().max(2000).allow('', null)
-});
+}).unknown(false); // Explicitly reject unknown fields to catch issues
 
 // Evaluation update schema
 const updateEvaluationSchema = Joi.object({
