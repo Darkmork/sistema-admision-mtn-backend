@@ -687,9 +687,9 @@ router.put('/:id', authenticateToken, validateCsrf, async (req, res) => {
 
     const updateQuery = hashedPassword ?
       `UPDATE users SET first_name = $2, last_name = $3, email = $4, password = $5, role = $6,
-       active = $7, email_verified = $8, rut = $9, phone = $10, subject = $11, updated_at = NOW() WHERE id = $1` :
+       active = $7, email_verified = $8, rut = $9, phone = $10, subject = $11, updated_at = NOW() WHERE id = $1 RETURNING *` :
       `UPDATE users SET first_name = $2, last_name = $3, email = $4, role = $5,
-       active = $6, email_verified = $7, rut = $8, phone = $9, subject = $10, updated_at = NOW() WHERE id = $1`;
+       active = $6, email_verified = $7, rut = $8, phone = $9, subject = $10, updated_at = NOW() WHERE id = $1 RETURNING *`;
 
     const params = hashedPassword ?
       [req.params.id, req.body.firstName, req.body.lastName, req.body.email, hashedPassword,
@@ -699,11 +699,12 @@ router.put('/:id', authenticateToken, validateCsrf, async (req, res) => {
        req.body.role, req.body.active, req.body.emailVerified !== undefined ? req.body.emailVerified : false,
        req.body.rut, req.body.phone, req.body.subject];
 
-    await client.query(updateQuery, params);
+    const result = await client.query(updateQuery, params);
 
     res.json({
       success: true,
-      message: 'Usuario actualizado exitosamente'
+      message: 'Usuario actualizado exitosamente',
+      data: result.rows[0]
     });
   } catch (error) {
     res.status(500).json({
