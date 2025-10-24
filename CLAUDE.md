@@ -1255,3 +1255,485 @@ async function makeRequest(url, options) {
 - **Guardian Service** (Port 8087): 3 protected routes (guardian management)
 
 **Note**: Notification and Dashboard services currently do NOT require CSRF tokens
+
+## Frontend Architecture Integration
+
+### Overview
+
+The frontend is a React + TypeScript application built with Vite, deployed on Vercel, and communicates with the Railway-hosted backend microservices through the Gateway Service.
+
+**Frontend Stack:**
+- **React 19.1** - UI framework
+- **TypeScript 5.7** - Type safety
+- **Vite 6.2** - Build tool & dev server
+- **React Router 7.6** - Client-side routing
+- **TanStack Query 5.90** - Server state management
+- **Axios 1.11** - HTTP client with retry logic
+- **Tailwind CSS** - Styling
+
+**Deployment:**
+- **Platform**: Vercel (Production) / Local dev (Port 5173)
+- **Build**: `npm run build` → static files in `/dist`
+- **Runtime**: Client-side only (no SSR)
+
+### Frontend-Backend Communication
+
+**Gateway URL Resolution** (`config/api.config.ts`):
+```typescript
+// Runtime detection (NOT build-time)
+export function getApiBaseUrl(): string {
+  const hostname = window.location.hostname;
+
+  // Vercel deployment → Railway backend
+  if (hostname.includes('vercel.app')) {
+    return 'https://gateway-service-production-a753.up.railway.app';
+  }
+
+  // Custom production domains
+  if (hostname === 'admision.mtn.cl' || hostname === 'admin.mtn.cl') {
+    return 'https://gateway-service-production-a753.up.railway.app';
+  }
+
+  // Local development → Local gateway
+  return 'http://localhost:8080';
+}
+```
+
+**CRITICAL**: API URL is determined at **runtime in the browser**, NOT at build time. This allows a single build to work in all environments (Vercel, production domains, local dev).
+
+### HTTP Client Architecture
+
+**Unified HTTP Client** (`services/http.ts`):
+
+```typescript
+class HttpClient {
+  // Features:
+  // - Runtime base URL detection
+  // - Automatic JWT token injection (Bearer)
+  // - CSRF token management (POST/PUT/DELETE/PATCH)
+  // - Exponential backoff retry (3 attempts, 408/429/500/502/503/504)
+  // - Request correlation IDs for tracing
+  // - 401 auto-redirect to login
+  // - 403 redirect to unauthorized page
+
+  async get<T>(url: string): Promise<T> { ... }
+  async post<T>(url: string, data: any): Promise<T> { ... }
+  async put<T>(url: string, data: any): Promise<T> { ... }
+  async delete<T>(url: string): Promise<T> { ... }
+}
+```
+
+**Request Flow:**
+```
+Frontend → httpClient
+  ↓
+  1. Detect runtime base URL (getApiBaseUrl())
+  2. Get JWT token from localStorage (auth_token or professor_token)
+  3. Get CSRF token if needed (csrfService)
+  4. Add headers (Authorization, X-CSRF-Token, X-Correlation-Id)
+  ↓
+Gateway Service (Railway)
+  ↓
+Microservice (User/Application/Evaluation/etc.)
+  ↓
+PostgreSQL
+```
+
+### CSRF Token Flow (Frontend)
+
+**CSRF Service** (`services/csrfService.ts`):
+
+```typescript
+class CsrfService {
+  private csrfToken: string | null = null;
+  private tokenExpiry: number | null = null;
+
+  // Fetch token from backend
+  async fetchCsrfToken(): Promise<string> {
+    const response = await api.get('/api/auth/csrf-token');
+    this.csrfToken = response.data.csrfToken;
+    this.tokenExpiry = Date.now() + 3600000; // 1 hour
+    return this.csrfToken;
+  }
+
+  // Get cached token or fetch new one if expired
+  async getCsrfToken(): Promise<string> {
+    if (this.csrfToken && Date.now() < this.tokenExpiry) {
+      return this.csrfToken;
+    }
+    return await this.fetchCsrfToken();
+  }
+
+  // Get headers for mutation requests
+  async getCsrfHeaders(): Promise<{ 'X-CSRF-Token': string }> {
+    const token = await this.getCsrfToken();
+    return { 'X-CSRF-Token': token };
+  }
+}
+```
+
+**Integration in HTTP Client:**
+```typescript
+// http.ts interceptor (lines 104-121)
+if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+  const csrfHeaders = await csrfService.getCsrfHeaders();
+  config.headers['X-CSRF-Token'] = csrfHeaders['X-CSRF-Token'];
+}
+```
+
+### Authentication Tokens
+
+**Token Storage Hierarchy:**
+1. `localStorage.getItem('auth_token')` - Regular users (apoderados)
+2. `localStorage.getItem('professor_token')` - School staff
+3. `oidcService.getAccessToken()` - OIDC fallback (if implemented)
+
+**Token Lifecycle:**
+- Set on login: `localStorage.setItem('auth_token', token)`
+- Retrieved on every request: httpClient interceptor
+- Cleared on logout: `localStorage.removeItem('auth_token')`
+- Auto-refresh on 401: oidcService.renewToken()
+
+### Frontend Service Layer
+
+**Service Pattern:**
+```typescript
+// Example: services/applicationService.ts
+import httpClient from './http';
+
+export const applicationService = {
+  async getAll() {
+    const response = await httpClient.get('/api/applications');
+    return response.data;
+  },
+
+  async create(data: CreateApplicationDto) {
+    // CSRF token automatically added by httpClient
+    const response = await httpClient.post('/api/applications', data);
+    return response.data;
+  },
+
+  async update(id: number, data: UpdateApplicationDto) {
+    const response = await httpClient.put(`/api/applications/${id}`, data);
+    return response.data;
+  },
+};
+```
+
+**Available Services:**
+- `authService.ts` - Login, register, password reset
+- `userService.ts` - User CRUD, profile
+- `applicationService.ts` - Student applications
+- `documentService.ts` - Document uploads
+- `evaluationService.ts` - Evaluations, scoring
+- `interviewService.ts` - Interview scheduling
+- `guardianService.ts` - Guardian management
+- `notificationService.ts` - Email/SMS notifications
+- `dashboardService.ts` - Analytics, statistics
+- `csrfService.ts` - CSRF token management
+
+### Environment Variables (Frontend)
+
+**Production** (`.env.production`):
+```bash
+# Runtime detection handles the URL automatically
+VITE_API_BASE_URL=https://gateway-service-production-a753.up.railway.app
+```
+
+**Development** (`.env.development`):
+```bash
+# Points to local gateway
+VITE_API_BASE_URL=http://localhost:8080
+```
+
+**IMPORTANT**: The `VITE_API_BASE_URL` is for documentation only. The actual URL is determined at runtime by `getApiBaseUrl()` in `config/api.config.ts`.
+
+### File Upload Handling
+
+**Document Upload Flow:**
+```typescript
+// Frontend: services/documentService.ts
+const formData = new FormData();
+formData.append('file', file);
+formData.append('documentType', 'BIRTH_CERTIFICATE');
+formData.append('applicationId', '123');
+
+// CSRF token added automatically
+await httpClient.post('/api/documents', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+
+// Backend: application-service/src/middleware/upload.js
+// - Multer validates file type, size
+// - Saves to ./uploads/ directory
+// - Returns file metadata
+```
+
+**Constraints:**
+- Max file size: 10MB
+- Max files per request: 5
+- Allowed types: PDF, JPG, PNG, GIF, DOC, DOCX
+- Document types must match backend VALID_DOCUMENT_TYPES array
+
+### Frontend Error Handling
+
+**HTTP Status Handling:**
+```typescript
+// 401 Unauthorized
+- Auto-redirect to /login
+- Save current path for post-login redirect
+- Attempt token refresh (oidcService)
+
+// 403 Forbidden
+- Redirect to /unauthorized page
+- User lacks required role
+
+// 408, 429, 500, 502, 503, 504
+- Automatic retry (3 attempts, exponential backoff)
+- Jitter to prevent thundering herd
+
+// Other errors
+- Throw HttpError with status, message, correlationId
+- Display to user via toast/notification
+```
+
+### Testing Frontend Integration
+
+**Local Development:**
+```bash
+# Terminal 1: Start backend gateway
+cd gateway-service && npm run dev
+
+# Terminal 2: Start all backend services
+# (see "Running the Full System Locally" section)
+
+# Terminal 3: Start frontend
+cd ../Admision_MTN_front
+npm run dev
+# Open http://localhost:5173
+```
+
+**Verify Integration:**
+```bash
+# Check frontend can reach gateway
+curl http://localhost:5173  # Frontend loads
+
+# Check API calls work
+# Login in browser, open DevTools → Network
+# Should see requests to http://localhost:8080/api/*
+
+# Check CSRF token flow
+# Open Console, look for:
+# [CSRF] Fetching new CSRF token...
+# 🛡️ http.ts - Added CSRF token to POST request
+```
+
+**Production Testing:**
+```bash
+# Vercel URL: https://admision-mtn-frontend.vercel.app
+# Should auto-detect and use Railway backend:
+# https://gateway-service-production-a753.up.railway.app
+
+# Check Console logs:
+# [API Config] Is Vercel? true
+# [API Config] ✅ Vercel deployment detected → Railway backend
+```
+
+### Common Frontend-Backend Issues
+
+**Issue: "Network Error" or "ERR_CONNECTION_REFUSED"**
+- **Cause**: Gateway not running or wrong URL
+- **Fix**:
+  - Verify gateway is running: `curl http://localhost:8080/health`
+  - Check browser console for actual URL being used
+  - Verify `getApiBaseUrl()` returns correct URL for environment
+
+**Issue: "401 Unauthorized" on every request**
+- **Cause**: Token not being sent or invalid
+- **Fix**:
+  - Check localStorage: `localStorage.getItem('auth_token')`
+  - Verify Authorization header in Network tab
+  - Check token hasn't expired (JWT exp claim)
+
+**Issue: "403 CSRF validation failed"**
+- **Cause**: CSRF token missing or invalid
+- **Fix**:
+  - Check Console: should see "🛡️ Added CSRF token to POST request"
+  - Verify `/api/auth/csrf-token` endpoint works
+  - Ensure CSRF_SECRET matches between frontend/backend services
+
+**Issue: CORS errors in browser**
+- **Cause**: Gateway CORS not configured for frontend origin
+- **Fix**:
+  - Check gateway CORS settings: `CORS_ORIGIN=http://localhost:5173`
+  - Verify preflight OPTIONS requests succeed (200)
+  - Check response headers: `Access-Control-Allow-Origin`
+
+**Issue: API calls work locally but fail on Vercel**
+- **Cause**: Runtime detection not working
+- **Fix**:
+  - Check Console logs in production browser
+  - Verify hostname detection logic in `api.config.ts`
+  - Test manually: call `debugApiConfig()` in browser Console
+
+### Frontend Development Workflow
+
+**Adding a new feature:**
+```bash
+# 1. Create backend endpoint (see "Adding a New Endpoint")
+# 2. Test endpoint with curl/Postman
+# 3. Add TypeScript types in frontend/types/
+# 4. Create/update service in frontend/services/
+# 5. Create React component in frontend/components/ or pages/
+# 6. Test locally with both frontend and backend running
+# 7. Deploy backend to Railway
+# 8. Deploy frontend to Vercel (auto-deploy on push)
+```
+
+**Example: Adding "Export Applications to Excel" feature**
+```bash
+# Backend
+cd application-service
+# Add GET /api/applications/export endpoint
+# Returns Excel file (Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)
+
+# Frontend
+cd Admision_MTN_front
+# Add to services/applicationService.ts:
+export const downloadApplicationsExcel = async () => {
+  const response = await httpClient.get('/api/applications/export', {
+    responseType: 'blob'
+  });
+
+  const url = window.URL.createObjectURL(new Blob([response]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', 'applications.xlsx');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+# Add button in components/ApplicationList.tsx:
+<button onClick={() => downloadApplicationsExcel()}>
+  Export to Excel
+</button>
+```
+
+### Deployment Checklist
+
+**Before deploying backend changes:**
+- [ ] All services pass tests: `npm test`
+- [ ] Database migrations applied (if any)
+- [ ] Environment variables updated in Railway
+- [ ] CSRF_SECRET and JWT_SECRET match across all services
+- [ ] Test endpoints with curl/Postman
+
+**Before deploying frontend changes:**
+- [ ] TypeScript compiles: `npm run build`
+- [ ] No ESLint errors
+- [ ] Runtime API detection works (test in browser Console)
+- [ ] CSRF token flow works for mutations
+- [ ] Authentication flow works (login, token storage, auto-logout)
+- [ ] File uploads work (if changed)
+
+**After deployment:**
+- [ ] Verify Vercel build succeeded
+- [ ] Check Railway services are healthy
+- [ ] Test critical user flows (login, create application, upload document)
+- [ ] Check browser Console for errors
+- [ ] Verify CORS working (no preflight errors)
+
+## Commit Message Convention
+
+This project follows [Conventional Commits](https://www.conventionalcommits.org/):
+
+**Format**: `type(scope): description`
+
+**Types**:
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `refactor`: Code refactoring
+- `test`: Test additions/changes
+- `chore`: Dependency updates, config changes
+- `perf`: Performance improvements
+- `style`: Code style changes (formatting, semicolons, etc.)
+- `build`: Build system changes
+- `ci`: CI/CD pipeline changes
+
+**Scopes** (service names):
+- `user`, `application`, `evaluation`, `notification`, `dashboard`, `guardian`, `gateway`
+- `frontend` - for frontend changes
+- `shared` - for shared utilities
+- `docs` - for documentation
+
+**Examples**:
+```bash
+git commit -m "feat(user): add two-factor authentication"
+git commit -m "fix(application): resolve file upload timeout"
+git commit -m "docs(readme): update installation guide"
+git commit -m "refactor(evaluation): improve circuit breaker logic"
+git commit -m "test(notification): add email service integration tests"
+git commit -m "chore(deps): upgrade express to 5.1.0"
+git commit -m "feat(frontend): add application export to Excel"
+git commit -m "fix(frontend): resolve CSRF token expiration issue"
+```
+
+## Branching Strategy
+
+### Main Branches
+
+- **`main`** - Production code (protected, requires PR)
+- **`develop`** - Development integration branch
+- **`hotfix/production`** - Urgent production fixes
+
+### Feature Branch Naming
+
+Follow this pattern for new features:
+
+```bash
+# Service-specific features
+feature/<service-name>/<description>
+
+# Examples:
+feature/user-service/add-2fa
+feature/application-service/improve-file-validation
+feature/evaluation-service/add-bulk-scoring
+feature/frontend/add-excel-export
+
+# Cross-service features
+feature/shared/update-logging-format
+
+# Bug fixes
+fix/<service-name>/<description>
+fix/gateway-service/cors-headers
+fix/frontend/csrf-token-refresh
+
+# Hotfixes (urgent production fixes)
+hotfix/<description>
+hotfix/fix-login-timeout
+hotfix/fix-file-upload-500
+```
+
+### Workflow
+
+```bash
+# Development of new functionality
+git checkout develop
+git pull origin develop
+git checkout -b feature/user-service/add-2fa
+# ... make changes ...
+git add .
+git commit -m "feat(user): add two-factor authentication"
+git push origin feature/user-service/add-2fa
+# Create Pull Request to develop
+
+# Hotfix urgent
+git checkout main
+git checkout -b hotfix/fix-login-bug
+# ... make changes ...
+git commit -m "fix(user): resolve login timeout issue"
+git push origin hotfix/fix-login-bug
+# Create Pull Request to main AND develop
+```
