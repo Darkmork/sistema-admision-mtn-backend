@@ -72,10 +72,49 @@ class EvaluationService {
 
   async getEvaluationById(id) {
     return await mediumQueryBreaker.fire(async () => {
-      const result = await dbPool.query('SELECT * FROM evaluations WHERE id = $1', [id]);
+      const query = `
+        SELECT
+          e.*,
+          a.id as application_id,
+          a.status as application_status,
+          a.submission_date,
+          s.id as student_id,
+          s.first_name as student_first_name,
+          s.paternal_last_name as student_paternal_last_name,
+          s.maternal_last_name as student_maternal_last_name,
+          s.rut as student_rut,
+          s.grade_applied as student_grade_applied
+        FROM evaluations e
+        LEFT JOIN applications a ON e.application_id = a.id
+        LEFT JOIN students s ON a.student_id = s.id
+        WHERE e.id = $1
+      `;
+      const result = await dbPool.query(query, [id]);
       if (result.rows.length === 0) return null;
-      logger.info(`Retrieved evaluation ${id}`);
-      return Evaluation.fromDatabaseRow(result.rows[0]);
+
+      const row = result.rows[0];
+      const evaluation = Evaluation.fromDatabaseRow(row);
+
+      // Add student info to response
+      const enrichedEvaluation = {
+        ...evaluation,
+        application: {
+          id: row.application_id,
+          status: row.application_status,
+          submissionDate: row.submission_date,
+          student: {
+            id: row.student_id,
+            firstName: row.student_first_name,
+            paternalLastName: row.student_paternal_last_name,
+            maternalLastName: row.student_maternal_last_name,
+            rut: row.student_rut,
+            gradeApplied: row.student_grade_applied
+          }
+        }
+      };
+
+      logger.info(`Retrieved evaluation ${id} with student info`);
+      return enrichedEvaluation;
     });
   }
 
