@@ -83,10 +83,16 @@ class EvaluationService {
           s.paternal_last_name as student_paternal_last_name,
           s.maternal_last_name as student_maternal_last_name,
           s.rut as student_rut,
-          s.grade_applied as student_grade_applied
+          s.grade_applied as student_grade_applied,
+          s.birth_date as student_birth_date,
+          s.current_school as student_current_school,
+          u.first_name as evaluator_first_name,
+          u.last_name as evaluator_last_name,
+          u.subject as evaluator_subject
         FROM evaluations e
         LEFT JOIN applications a ON e.application_id = a.id
         LEFT JOIN students s ON a.student_id = s.id
+        LEFT JOIN users u ON e.evaluator_id = u.id
         WHERE e.id = $1
       `;
       const result = await dbPool.query(query, [id]);
@@ -108,8 +114,15 @@ class EvaluationService {
             paternalLastName: row.student_paternal_last_name,
             maternalLastName: row.student_maternal_last_name,
             rut: row.student_rut,
-            gradeApplied: row.student_grade_applied
+            gradeApplied: row.student_grade_applied,
+            birthDate: row.student_birth_date,
+            currentSchool: row.student_current_school
           }
+        },
+        evaluator: {
+          firstName: row.evaluator_first_name,
+          lastName: row.evaluator_last_name,
+          subject: row.evaluator_subject
         }
       };
 
@@ -211,10 +224,16 @@ class EvaluationService {
           s.paternal_last_name as student_paternal_last_name,
           s.maternal_last_name as student_maternal_last_name,
           s.rut as student_rut,
-          s.grade_applied as student_grade_applied
+          s.grade_applied as student_grade_applied,
+          s.birth_date as student_birth_date,
+          s.current_school as student_current_school,
+          u.first_name as evaluator_first_name,
+          u.last_name as evaluator_last_name,
+          u.subject as evaluator_subject
         FROM evaluations e
         LEFT JOIN applications a ON e.application_id = a.id
         LEFT JOIN students s ON a.student_id = s.id
+        LEFT JOIN users u ON e.evaluator_id = u.id
         WHERE e.evaluator_id = $1
       `;
       const params = [evaluatorId];
@@ -272,8 +291,15 @@ class EvaluationService {
               paternalLastName: row.student_paternal_last_name,
               maternalLastName: row.student_maternal_last_name,
               rut: row.student_rut,
-              gradeApplied: row.student_grade_applied
+              gradeApplied: row.student_grade_applied,
+              birthDate: row.student_birth_date,
+              currentSchool: row.student_current_school
             }
+          },
+          evaluator: {
+            firstName: row.evaluator_first_name,
+            lastName: row.evaluator_last_name,
+            subject: row.evaluator_subject
           }
         };
       });
