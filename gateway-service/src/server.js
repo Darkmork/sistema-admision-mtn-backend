@@ -492,8 +492,8 @@ app.use((err, req, res, next) => {
 // En Railway, escuchar en :: soporta IPv4 e IPv6 (necesario para private networking)
 const server = app.listen(PORT, '::', () => {
   logger.info(`==============================================`);
-  logger.info(`API Gateway running on port ${PORT}`);
-  logger.info(`Listening on :: (IPv4/IPv6) - supports Railway private networking`);
+  logger.info(`🚀 API Gateway running on port ${PORT}`);
+  logger.info(`📡 Listening on :: (IPv4/IPv6) - supports Railway private networking`);
   logger.info(`Type: Express Gateway with Centralized JWT Auth`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`Health check: http://localhost:${PORT}/health`);
