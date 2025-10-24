@@ -46,7 +46,9 @@ class EvaluationController {
 
   async createEvaluation(req, res) {
     try {
-      const evaluatorId = req.user.userId;
+      // Si viene evaluatorId en el body, usarlo (para asignación por admin)
+      // Si no, usar el userId del token (para auto-asignación por profesor)
+      const evaluatorId = req.body.evaluatorId || req.user.userId;
       const evaluation = await EvaluationService.createEvaluation(req.body, evaluatorId);
 
       return res.status(201).json(ok(evaluation.toJSON()));
