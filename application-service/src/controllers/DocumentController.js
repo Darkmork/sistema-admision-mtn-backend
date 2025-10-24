@@ -4,11 +4,10 @@
  */
 
 const DocumentService = require('../services/DocumentService');
-const { uploadFile } = require('../services/VercelBlobService');
+const { uploadFile, deleteFile } = require('../services/VercelBlobService');
 const { ok, fail } = require('../utils/responseHelpers');
 const { VALID_DOCUMENT_TYPES } = require('../middleware/upload');
 const logger = require('../utils/logger');
-const fs = require('fs');
 
 class DocumentController {
   /**
@@ -96,6 +95,7 @@ class DocumentController {
 
   /**
    * GET /api/documents/:id/download
+   * Redirects to Vercel Blob URL for download
    */
   async downloadDocument(req, res) {
     try {
@@ -108,14 +108,21 @@ class DocumentController {
         );
       }
 
-      const fileExists = await DocumentService.fileExists(document.filePath);
-      if (!fileExists) {
+      // Vercel Blob URLs are already publicly accessible
+      // Redirect to the blob URL with download disposition
+      const blobUrl = document.filePath; // This is the Vercel Blob URL
+
+      if (!blobUrl || !blobUrl.startsWith('http')) {
         return res.status(404).json(
-          fail('DOC_007', 'Document file not found on disk')
+          fail('DOC_007', 'Document file URL is invalid')
         );
       }
 
-      res.download(document.filePath, document.fileName);
+      // Add download parameter to force download instead of inline view
+      const downloadUrl = `${blobUrl}${blobUrl.includes('?') ? '&' : '?'}download=1`;
+
+      logger.info(`Redirecting to download URL for document ${id}: ${downloadUrl}`);
+      res.redirect(downloadUrl);
     } catch (error) {
       logger.error(`Error downloading document ${req.params.id}:`, error);
       return res.status(500).json(
@@ -126,6 +133,7 @@ class DocumentController {
 
   /**
    * GET /api/applications/documents/view/:id
+   * Redirects to Vercel Blob URL for inline viewing
    */
   async viewDocument(req, res) {
     try {
@@ -138,19 +146,18 @@ class DocumentController {
         );
       }
 
-      const fileExists = await DocumentService.fileExists(document.filePath);
-      if (!fileExists) {
+      // Vercel Blob URLs are already publicly accessible
+      // Redirect directly to the blob URL for inline viewing
+      const blobUrl = document.filePath; // This is the Vercel Blob URL
+
+      if (!blobUrl || !blobUrl.startsWith('http')) {
         return res.status(404).json(
-          fail('DOC_010', 'Document file not found on disk')
+          fail('DOC_010', 'Document file URL is invalid')
         );
       }
 
-      // Set headers for inline viewing
-      res.setHeader('Content-Type', document.mimeType);
-      res.setHeader('Content-Disposition', `inline; filename="${document.fileName}"`);
-
-      const fileStream = fs.createReadStream(document.filePath);
-      fileStream.pipe(res);
+      logger.info(`Redirecting to view URL for document ${id}: ${blobUrl}`);
+      res.redirect(blobUrl);
     } catch (error) {
       logger.error(`Error viewing document ${req.params.id}:`, error);
       return res.status(500).json(
@@ -198,11 +205,14 @@ class DocumentController {
 
   /**
    * DELETE /api/applications/documents/:id
+   * Deletes document from both database and Vercel Blob storage
    */
   async deleteDocument(req, res) {
     try {
       const { id } = req.params;
-      const document = await DocumentService.deleteDocument(id);
+
+      // First get the document to retrieve the Vercel Blob URL
+      const document = await DocumentService.getDocumentById(id);
 
       if (!document) {
         return res.status(404).json(
@@ -210,8 +220,28 @@ class DocumentController {
         );
       }
 
+      const blobUrl = document.filePath;
+
+      // Delete from database first
+      const deletedDocument = await DocumentService.deleteDocument(id);
+
+      // Then delete from Vercel Blob if URL exists
+      if (blobUrl && blobUrl.startsWith('http')) {
+        try {
+          await deleteFile(blobUrl);
+          logger.info(`Deleted file from Vercel Blob: ${blobUrl}`);
+        } catch (blobError) {
+          // Log error but don't fail the request since DB deletion succeeded
+          logger.error(`Failed to delete file from Vercel Blob: ${blobUrl}`, blobError);
+          logger.warn('Document deleted from database but file may remain in blob storage');
+        }
+      }
+
       return res.json(
-        ok({ message: 'Document deleted successfully', document: document.toJSON() })
+        ok({
+          message: 'Document deleted successfully',
+          document: deletedDocument.toJSON()
+        })
       );
     } catch (error) {
       logger.error(`Error deleting document ${req.params.id}:`, error);
