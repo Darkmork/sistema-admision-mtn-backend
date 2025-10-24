@@ -36,7 +36,8 @@ class EvaluationController {
         return res.status(404).json(fail('EVAL_002', `Evaluation ${id} not found`));
       }
 
-      return res.json(ok(evaluation.toJSON()));
+      // getEvaluationById returns enriched data (plain object), not a model instance
+      return res.json(ok(evaluation));
     } catch (error) {
       logger.error(`Error getting evaluation ${req.params.id}:`, error);
       return res.status(500).json(fail('EVAL_003', 'Failed to retrieve evaluation', error.message));
