@@ -134,7 +134,8 @@ class ApplicationController {
       const invalidated = req.applicationCache.invalidatePattern('applications:list:*');
       logger.info(`Cache invalidated after UPDATE: ${invalidated} entries`);
 
-      return res.json(ok(application.toJSON()));
+      // getApplicationById returns plain object already formatted for frontend
+      return res.json(ok(application));
     } catch (error) {
       logger.error(`Error updating application ${req.params.id}:`, error);
       return res.status(500).json(
