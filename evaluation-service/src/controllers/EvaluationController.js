@@ -105,15 +105,19 @@ class EvaluationController {
       const { page: pageNum = 0, limit = 10, status, evaluationType } = req.query;
 
       const filters = {
-        evaluatorId: parseInt(evaluatorId),
         ...(status && { status }),
         ...(evaluationType && { evaluationType })
       };
 
-      const result = await EvaluationService.getAllEvaluations(filters, parseInt(pageNum), parseInt(limit));
+      const result = await EvaluationService.getMyEvaluationsWithStudentInfo(
+        parseInt(evaluatorId),
+        filters,
+        parseInt(pageNum),
+        parseInt(limit)
+      );
 
       return res.json(page(
-        result.evaluations.map(e => e.toJSON()),
+        result.evaluations,
         result.total,
         result.page,
         result.limit

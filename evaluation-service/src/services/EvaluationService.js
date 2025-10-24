@@ -155,6 +155,98 @@ class EvaluationService {
       return Evaluation.fromDatabaseRows(result.rows);
     });
   }
+
+  async getMyEvaluationsWithStudentInfo(evaluatorId, filters = {}, page = 0, limit = 10) {
+    return await mediumQueryBreaker.fire(async () => {
+      const { status, evaluationType } = filters;
+      const offset = page * limit;
+
+      let query = `
+        SELECT
+          e.*,
+          a.id as application_id,
+          a.status as application_status,
+          a.submission_date,
+          s.id as student_id,
+          s.first_name as student_first_name,
+          s.paternal_last_name as student_paternal_last_name,
+          s.maternal_last_name as student_maternal_last_name,
+          s.rut as student_rut,
+          s.grade_applied as student_grade_applied
+        FROM evaluations e
+        LEFT JOIN applications a ON e.application_id = a.id
+        LEFT JOIN students s ON a.student_id = s.id
+        WHERE e.evaluator_id = $1
+      `;
+      const params = [evaluatorId];
+      let paramIndex = 2;
+
+      if (status) {
+        query += ` AND e.status = $${paramIndex++}`;
+        params.push(status);
+      }
+      if (evaluationType) {
+        query += ` AND e.evaluation_type = $${paramIndex++}`;
+        params.push(evaluationType);
+      }
+
+      query += ` ORDER BY e.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex}`;
+      params.push(limit, offset);
+
+      const result = await dbPool.query(query, params);
+
+      // Count query
+      let countQuery = `
+        SELECT COUNT(*)
+        FROM evaluations e
+        WHERE e.evaluator_id = $1
+      `;
+      const countParams = [evaluatorId];
+      let countIndex = 2;
+
+      if (status) {
+        countQuery += ` AND e.status = $${countIndex++}`;
+        countParams.push(status);
+      }
+      if (evaluationType) {
+        countQuery += ` AND e.evaluation_type = $${countIndex++}`;
+        countParams.push(evaluationType);
+      }
+
+      const countResult = await dbPool.query(countQuery, countParams);
+      const total = parseInt(countResult.rows[0].count);
+
+      logger.info(`Retrieved ${result.rows.length} evaluations with student info for evaluator ${evaluatorId}`);
+
+      // Map results to include student data in a nested structure
+      const evaluations = result.rows.map(row => {
+        const evaluation = Evaluation.fromDatabaseRow(row);
+        return {
+          ...evaluation,
+          application: {
+            id: row.application_id,
+            status: row.application_status,
+            submissionDate: row.submission_date,
+            student: {
+              id: row.student_id,
+              firstName: row.student_first_name,
+              paternalLastName: row.student_paternal_last_name,
+              maternalLastName: row.student_maternal_last_name,
+              rut: row.student_rut,
+              gradeApplied: row.student_grade_applied
+            }
+          }
+        };
+      });
+
+      return {
+        evaluations,
+        total,
+        page,
+        limit
+      };
+    });
+  }
 }
 
 module.exports = new EvaluationService();
