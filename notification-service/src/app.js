@@ -4,6 +4,7 @@ const logger = require('./utils/logger');
 const { ok } = require('./utils/responseHelpers');
 const notificationRoutes = require('./routes/notificationRoutes');
 const emailRoutes = require('./routes/emailRoutes');
+const institutionalEmailRoutes = require('./routes/institutionalEmailRoutes');
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/email', emailRoutes);
+app.use('/api/institutional-emails', institutionalEmailRoutes);
 
 // 404 handler
 app.use((req, res) => {
