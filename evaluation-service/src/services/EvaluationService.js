@@ -136,6 +136,20 @@ class EvaluationService {
       const evaluation = new Evaluation({ ...evaluationData, evaluatorId });
       const dbData = evaluation.toDatabase();
 
+      // Check for duplicate evaluation (same application_id and evaluation_type)
+      const duplicateCheck = await dbPool.query(
+        `SELECT id, evaluator_id, status
+         FROM evaluations
+         WHERE application_id = $1 AND evaluation_type = $2`,
+        [dbData.application_id, dbData.evaluation_type]
+      );
+
+      if (duplicateCheck.rows.length > 0) {
+        const existing = duplicateCheck.rows[0];
+        logger.warn(`Duplicate evaluation attempt: application_id=${dbData.application_id}, type=${dbData.evaluation_type}, existing_id=${existing.id}`);
+        throw new Error(`Ya existe una evaluación de tipo ${dbData.evaluation_type} asignada para esta postulación (ID: ${existing.id}, Estado: ${existing.status})`);
+      }
+
       const result = await dbPool.query(
         `INSERT INTO evaluations (
           application_id, evaluator_id, evaluation_type, score, max_score,
