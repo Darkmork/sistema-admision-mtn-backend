@@ -127,10 +127,10 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-// En Railway, escuchar en :: soporta IPv6 (necesario para private networking)
-app.listen(port, '::', () => {
+// En Railway, escuchar en 0.0.0.0 permite conexiones desde otros servicios en la red privada
+app.listen(port, '0.0.0.0', () => {
   console.log(`✅ User Service running on port ${port}`);
-  console.log(`✅ Listening on :: (IPv4/IPv6) - Railway private networking enabled`);
+  console.log(`✅ Listening on 0.0.0.0:${port} (accessible via private network)`);
   console.log('✅ Database connection pooling enabled');
   console.log('✅ Circuit breakers enabled (Simple, Medium, Write)');
 });
