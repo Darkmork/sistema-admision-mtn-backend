@@ -680,6 +680,107 @@ Test databases should be separate from development databases.
 - Configure health check intervals (30s recommended)
 - Use Docker for consistent deployments
 
+## Evaluation Assignment System
+
+### Duplicate Prevention Pattern
+
+The evaluation service implements a complete duplicate prevention system to ensure each student receives only one evaluation per type.
+
+**Backend Validation** (`evaluation-service/src/services/EvaluationService.js:139-151`):
+```javascript
+// Check for duplicate before INSERT
+const duplicateCheck = await dbPool.query(
+  `SELECT id, evaluator_id, status
+   FROM evaluations
+   WHERE application_id = $1 AND evaluation_type = $2`,
+  [applicationId, evaluationType]
+);
+
+if (duplicateCheck.rows.length > 0) {
+  throw new Error(`Ya existe una evaluación de tipo ${evaluationType}...`);
+}
+```
+
+**Controller Error Handling** (`evaluation-service/src/controllers/EvaluationController.js:58-61`):
+```javascript
+// Return 409 Conflict for duplicates instead of 500
+if (error.message.includes('Ya existe una evaluación')) {
+  return res.status(409).json(fail('EVAL_DUPLICATE', 'Duplicate evaluation', error.message));
+}
+```
+
+**Frontend UI Blocking** (`EvaluationManagement.tsx:462-504`):
+```typescript
+// Load existing evaluations when modal opens
+useEffect(() => {
+  if (isOpen) {
+    loadExistingEvaluations();
+  }
+}, [isOpen, application.id]);
+
+// Disable dropdowns for already-assigned evaluations
+const isAlreadyAssigned = existingEvaluations.some(
+  (ev: any) => ev.evaluationType === evaluationType
+);
+
+<select disabled={isAlreadyAssigned}>
+  {/* Evaluation options */}
+</select>
+```
+
+**Submit Logic** (`EvaluationManagement.tsx:520-532`):
+```typescript
+// Filter out already-assigned evaluations before submitting
+const validAssignments = assignments.filter(a => {
+  const isAlreadyAssigned = existingEvaluations.some(
+    (ev: any) => ev.evaluationType === a.evaluationType
+  );
+  return a.evaluatorId > 0 && !isAlreadyAssigned;
+});
+```
+
+**Key Points**:
+- Backend enforces uniqueness constraint: (application_id, evaluation_type)
+- Frontend prevents UI submission of duplicates
+- Backend returns 409 Conflict if duplicate attempt occurs
+- Evaluations already assigned show "Ya asignado" badge and disabled dropdown
+
+### Score Display Pattern
+
+**CRITICAL**: Always use `evaluation.maxScore` instead of hardcoded `/100`
+
+**Correct**:
+```typescript
+<p>Puntaje: {evaluation.score}/{evaluation.maxScore || 100}</p>
+```
+
+**Incorrect**:
+```typescript
+<p>Puntaje: {evaluation.score}/100</p>  // ❌ Wrong if teacher used different maxScore
+```
+
+**Affected Files**:
+- `StudentDetailModal.tsx:1742`
+- `EvaluationReports.tsx:304, 614`
+- Any component displaying evaluation scores
+
+### Response Format Extraction
+
+**CRITICAL**: Backend uses standardized response format `{ success: true, data: [...] }`
+
+When calling evaluation endpoints, always extract data correctly:
+
+**Correct**:
+```typescript
+const response = await api.get('/api/evaluations/application/:id');
+const evaluations = response.data.data || response.data;  // ✅ Handles both formats
+```
+
+**Incorrect**:
+```typescript
+const evaluations = response.data;  // ❌ Gets wrapper object instead of array
+```
+
 ## Validation Patterns
 
 ### RUT Validation (Chilean ID)
@@ -750,7 +851,13 @@ Each service has its own README with:
 - Testing instructions
 - Deployment notes
 
-**Recent Changes (2025-10-21)**:
+**Recent Changes (2025-10-24)**:
+- **Evaluation duplicate prevention** - Backend validates and prevents duplicate evaluation assignments (409 Conflict)
+- **Evaluation assignment UI blocking** - Frontend modal loads existing evaluations and disables already-assigned types
+- **MaxScore display fix** - All evaluation score displays now use actual maxScore instead of hardcoded /100
+- **Response format standardization** - Fixed evaluationService.getEvaluationsByApplicationId to extract data from response.data.data
+
+**Previous Changes (2025-10-21)**:
 - **Document upload system fully functional** - Fixed document type validation alignment between code and database
 - **Critical bug fixes**:
   - Added `created_at = NOW()` to DocumentService.js INSERT statements (application-service/src/services/DocumentService.js:27)
