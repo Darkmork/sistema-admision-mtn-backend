@@ -342,6 +342,8 @@ const makeProxy = (target, path = '', additionalOptions = {}) => {
     secure: false, // Allow self-signed certificates (for Railway internal URLs)
     timeout: 20000, // Client timeout (20s)
     proxyTimeout: 15000, // Backend timeout (15s)
+    followRedirects: false, // Don't follow redirects, proxy them
+    autoRewrite: true, // Rewrite the location host/port on redirects
     // If path is provided, prepend it back (Express strips it)
     ...(path && {
       pathRewrite: (pathStr, req) => {
