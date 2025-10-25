@@ -57,6 +57,79 @@ router.get('/public/all', async (req, res) => {
 // GET /api/applications/statistics - Alias for /stats (MUST BE BEFORE /:id)
 router.get('/statistics', ApplicationController.getApplicationStats.bind(ApplicationController));
 
+// GET /api/applications/:id/contact - Public endpoint for notification-service to get applicant contact info
+// This allows notification-service to fetch email without authentication
+router.get('/:id/contact', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await dbPool.query(
+      `SELECT
+        a.id,
+        a.applicant_user_id,
+        u.email as applicant_email,
+        u.first_name as applicant_first_name,
+        u.last_name as applicant_last_name,
+        g.email as guardian_email,
+        g.full_name as guardian_full_name,
+        s.father_email,
+        s.father_full_name,
+        s.mother_email,
+        s.mother_full_name,
+        s.first_name as student_first_name,
+        s.paternal_last_name as student_paternal_last_name,
+        s.maternal_last_name as student_maternal_last_name
+      FROM applications a
+      LEFT JOIN users u ON a.applicant_user_id = u.id
+      LEFT JOIN guardians g ON a.guardian_id = g.id
+      LEFT JOIN students s ON a.student_id = s.id
+      WHERE a.id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Application not found'
+      });
+    }
+
+    const data = result.rows[0];
+
+    res.json({
+      success: true,
+      data: {
+        applicationId: data.id,
+        applicantUser: data.applicant_email ? {
+          email: data.applicant_email,
+          firstName: data.applicant_first_name,
+          lastName: data.applicant_last_name
+        } : null,
+        guardian: data.guardian_email ? {
+          email: data.guardian_email,
+          fullName: data.guardian_full_name
+        } : null,
+        father: data.father_email ? {
+          email: data.father_email,
+          fullName: data.father_full_name
+        } : null,
+        mother: data.mother_email ? {
+          email: data.mother_email,
+          fullName: data.mother_full_name
+        } : null,
+        studentName: `${data.student_first_name || ''} ${data.student_paternal_last_name || ''} ${data.student_maternal_last_name || ''}`.trim()
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching application contact:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener información de contacto',
+      details: error.message
+    });
+  }
+});
+
 // GET /api/applications/recent - Get recent applications (MUST BE BEFORE /:id)
 router.get('/recent', authenticate, async (req, res) => {
   try {
