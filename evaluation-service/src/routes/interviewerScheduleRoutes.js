@@ -115,9 +115,9 @@ router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR')
     const result = await dbPool.query(`
       INSERT INTO interviewer_schedules (
         interviewer_id, day_of_week, start_time, end_time, year,
-        specific_date, schedule_type, notes, is_active
+        specific_date, schedule_type, notes, is_active, date, user_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $6, NULL)
       RETURNING *
     `, [interviewerId, dayOfWeek, startTime, endTime, year, specificDate, scheduleType || 'RECURRING', notes]);
 
