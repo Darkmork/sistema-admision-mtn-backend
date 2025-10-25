@@ -128,8 +128,10 @@ router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR')
     const user = userResult.rows[0];
 
     // Invalidate interviewer list cache (schedule count changed)
-    const invalidated = req.evaluationCache.invalidatePattern('interviewers:*');
-    console.log(`Cache invalidated after schedule CREATE: ${invalidated} entries`);
+    if (req.evaluationCache) {
+      const invalidated = req.evaluationCache.invalidatePattern('interviewers:*');
+      console.log(`Cache invalidated after schedule CREATE: ${invalidated} entries`);
+    }
 
     res.status(201).json({
       id: created.id,
@@ -292,8 +294,10 @@ router.put('/:id', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR
     }
 
     // Invalidate interviewer and interview caches (availability changed)
-    const invalidated = req.evaluationCache.invalidatePattern('interviewers:*');
-    console.log(`Cache invalidated after schedule UPDATE: ${invalidated} entries`);
+    if (req.evaluationCache) {
+      const invalidated = req.evaluationCache.invalidatePattern('interviewers:*');
+      console.log(`Cache invalidated after schedule UPDATE: ${invalidated} entries`);
+    }
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -355,8 +359,10 @@ router.delete('/:id', authenticate, validateCsrf, requireRole('ADMIN'), async (r
     }
 
     // Invalidate interviewer list cache (schedule count changed)
-    const invalidated = req.evaluationCache.invalidatePattern('interviewers:*');
-    console.log(`Cache invalidated after schedule DELETE: ${invalidated} entries`);
+    if (req.evaluationCache) {
+      const invalidated = req.evaluationCache.invalidatePattern('interviewers:*');
+      console.log(`Cache invalidated after schedule DELETE: ${invalidated} entries`);
+    }
 
     res.json({
       success: true,
