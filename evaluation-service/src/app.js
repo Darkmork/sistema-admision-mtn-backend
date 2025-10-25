@@ -109,6 +109,43 @@ app.get('/api/evaluations/cache/stats', (req, res) => {
   }
 });
 
+// Temporary endpoint to fix database schema
+app.post('/api/fix-schema-interviewer-schedules', async (req, res) => {
+  try {
+    const { dbPool } = require('./config/database');
+
+    // Make date column nullable
+    await dbPool.query('ALTER TABLE interviewer_schedules ALTER COLUMN date DROP NOT NULL;');
+    logger.info('✅ date column is now nullable');
+
+    // Make user_id column nullable
+    await dbPool.query('ALTER TABLE interviewer_schedules ALTER COLUMN user_id DROP NOT NULL;');
+    logger.info('✅ user_id column is now nullable');
+
+    // Verify changes
+    const result = await dbPool.query(`
+      SELECT column_name, is_nullable, data_type
+      FROM information_schema.columns
+      WHERE table_name = 'interviewer_schedules'
+        AND column_name IN ('date', 'user_id')
+      ORDER BY column_name;
+    `);
+
+    res.json({
+      success: true,
+      message: 'Schema fixed successfully',
+      columns: result.rows
+    });
+  } catch (error) {
+    logger.error('Error fixing schema:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error fixing schema',
+      details: error.message
+    });
+  }
+});
+
 // Routes
 app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/interviews', interviewRoutes);
