@@ -820,4 +820,183 @@ router.post('/admission-result/:applicationId', async (req, res) => {
   }
 });
 
+/**
+ * @route   POST /api/institutional-emails/evaluation-assignment/:evaluationId
+ * @desc    Send evaluation assignment notification to evaluator (teacher/psychologist)
+ * @access  Public (called by evaluation-service)
+ */
+router.post('/evaluation-assignment/:evaluationId', async (req, res) => {
+  try {
+    const { evaluationId } = req.params;
+    const { evaluatorEmail, evaluatorName, studentName, evaluationType, applicationId } = req.body;
+
+    logger.info(`📧 Sending evaluation assignment email for evaluation ${evaluationId}`);
+
+    // Validation
+    if (!evaluatorEmail || !evaluatorName || !studentName || !evaluationType) {
+      return res.status(400).json(fail(
+        'INST_EMAIL_007',
+        'Missing required fields',
+        'evaluatorEmail, evaluatorName, studentName, and evaluationType are required'
+      ));
+    }
+
+    // Map evaluation type to Spanish label
+    const evaluationTypeLabels = {
+      'MATHEMATICS_EXAM': 'Examen de Matemáticas',
+      'LANGUAGE_EXAM': 'Examen de Lenguaje',
+      'PSYCHOSOCIAL_INTERVIEW': 'Entrevista Psicosocial',
+      'FAMILY_INTERVIEW': 'Entrevista Familiar',
+      'DIRECTOR_INTERVIEW': 'Entrevista con Director',
+      'ACADEMIC_PERFORMANCE': 'Evaluación de Rendimiento Académico',
+      'BEHAVIORAL_ASSESSMENT': 'Evaluación Conductual'
+    };
+
+    const evaluationLabel = evaluationTypeLabels[evaluationType] || evaluationType;
+
+    // Email subject and message
+    const subject = `📋 Nueva Evaluación Asignada - ${evaluationLabel}`;
+
+    const message = `
+<div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+  <!-- Header con logo/banner -->
+  <div style="background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+    <h1 style="color: #ffffff; margin: 0; font-size: 26px;">📋 Nueva Evaluación Asignada</h1>
+    <p style="color: #d8f3dc; margin: 10px 0 0 0; font-size: 16px;">Colegio Monte Tabor y Nazaret</p>
+  </div>
+
+  <!-- Contenido principal -->
+  <div style="background-color: #ffffff; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+
+    <!-- Saludo personalizado -->
+    <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+      Estimado/a <strong style="color: #2d6a4f;">${evaluatorName}</strong>,
+    </p>
+
+    <p style="color: #555; font-size: 15px; line-height: 1.6; margin-bottom: 25px;">
+      Se le ha asignado una nueva evaluación en el proceso de admisión del Colegio Monte Tabor y Nazaret.
+    </p>
+
+    <!-- Información de la evaluación -->
+    <div style="background: linear-gradient(135deg, #d8f3dc 0%, #b7e4c7 100%); padding: 25px; border-radius: 8px; margin-bottom: 25px;">
+      <h3 style="color: #1b4332; margin: 0 0 20px 0; font-size: 18px; border-bottom: 2px solid #52b788; padding-bottom: 10px;">
+        📝 Detalles de la Evaluación
+      </h3>
+
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 12px 0; color: #2d6a4f; font-weight: bold; width: 40%;">
+            👨‍🎓 Estudiante:
+          </td>
+          <td style="padding: 12px 0; color: #1b4332; font-size: 15px;">
+            <strong>${studentName}</strong>
+          </td>
+        </tr>
+        <tr style="background-color: rgba(255, 255, 255, 0.5);">
+          <td style="padding: 12px 0; color: #2d6a4f; font-weight: bold;">
+            📋 Tipo de Evaluación:
+          </td>
+          <td style="padding: 12px 0; color: #1b4332; font-size: 15px;">
+            <strong>${evaluationLabel}</strong>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 0; color: #2d6a4f; font-weight: bold;">
+            🔢 ID de Evaluación:
+          </td>
+          <td style="padding: 12px 0; color: #666; font-size: 14px;">
+            #${evaluationId}
+          </td>
+        </tr>
+        ${applicationId ? `
+        <tr style="background-color: rgba(255, 255, 255, 0.5);">
+          <td style="padding: 12px 0; color: #2d6a4f; font-weight: bold;">
+            📄 ID de Postulación:
+          </td>
+          <td style="padding: 12px 0; color: #666; font-size: 14px;">
+            #${applicationId}
+          </td>
+        </tr>
+        ` : ''}
+      </table>
+    </div>
+
+    <!-- Próximos pasos -->
+    <div style="background-color: #fff3cd; border-left: 5px solid #ffc107; padding: 20px; border-radius: 5px; margin-bottom: 25px;">
+      <h4 style="color: #856404; margin-top: 0; font-size: 16px;">
+        📌 Próximos Pasos
+      </h4>
+      <ul style="color: #856404; font-size: 14px; line-height: 1.8; margin: 10px 0; padding-left: 20px;">
+        <li>Acceda al sistema de admisiones para ver los detalles completos</li>
+        <li>Revise la información del estudiante antes de la evaluación</li>
+        <li>Coordine la fecha y hora de la evaluación (si aplica)</li>
+        <li>Complete la evaluación dentro del plazo establecido</li>
+      </ul>
+    </div>
+
+    <!-- Información importante -->
+    <div style="background-color: #e3f2fd; border-left: 5px solid #2196f3; padding: 20px; border-radius: 5px; margin-bottom: 25px;">
+      <h4 style="color: #0d47a1; margin-top: 0; font-size: 16px;">
+        ℹ️ Información Importante
+      </h4>
+      <p style="color: #1565c0; font-size: 14px; line-height: 1.6; margin: 0;">
+        Por favor, complete esta evaluación a la brevedad posible. Recuerde que su evaluación es fundamental para el proceso de admisión del estudiante. Si tiene alguna pregunta o necesita más información, no dude en contactar al equipo de admisiones.
+      </p>
+    </div>
+
+    <!-- Mensaje de cierre -->
+    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
+
+    <p style="color: #666; font-size: 14px; line-height: 1.6; margin-bottom: 5px;">
+      Gracias por su compromiso con el proceso de admisión.
+    </p>
+    <p style="color: #2d6a4f; font-size: 15px; font-weight: bold; margin: 0;">
+      Equipo de Admisiones<br>
+      Colegio Monte Tabor y Nazaret
+    </p>
+
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+    <p style="margin: 0;">Este es un correo automático, por favor no responder.</p>
+    <p style="margin: 5px 0 0 0;">Si tiene dudas, contacte a admisiones@mtn.cl</p>
+  </div>
+</div>
+    `.trim();
+
+    // Send email
+    try {
+      const result = await emailService.sendEmail(evaluatorEmail, subject, message);
+
+      logger.info(`✅ Evaluation assignment email sent for evaluation ${evaluationId}`, {
+        messageId: result.messageId,
+        recipient: evaluatorEmail,
+        evaluationType
+      });
+
+      res.json(ok({
+        message: 'Evaluation assignment email sent successfully',
+        evaluationId,
+        emailSent: true,
+        recipient: evaluatorEmail,
+        messageId: result.messageId
+      }));
+    } catch (emailError) {
+      logger.error('❌ Error sending evaluation assignment email:', emailError);
+
+      // Return success but indicate email failed (so evaluation assignment can continue)
+      res.json(ok({
+        message: 'Evaluation assigned but email failed to send',
+        evaluationId,
+        emailSent: false,
+        error: emailError.message
+      }));
+    }
+  } catch (error) {
+    logger.error('Error in evaluation-assignment endpoint:', error);
+    res.status(500).json(fail('INST_EMAIL_007', 'Error processing evaluation assignment notification', error.message));
+  }
+});
+
 module.exports = router;

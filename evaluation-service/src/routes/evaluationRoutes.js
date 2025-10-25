@@ -390,10 +390,60 @@ router.post('/:id/assign', authenticate, validateCsrf, requireRole('ADMIN', 'COO
       });
     }
 
+    const evaluation = result.rows[0];
+
+    // Fetch additional data for email notification
+    try {
+      const detailsQuery = await dbPool.query(`
+        SELECT
+          e.id,
+          e.application_id,
+          e.evaluation_type,
+          u.email as evaluator_email,
+          u.first_name as evaluator_first_name,
+          u.last_name as evaluator_last_name,
+          s.first_name as student_first_name,
+          s.paternal_last_name as student_paternal_last_name,
+          s.maternal_last_name as student_maternal_last_name
+        FROM evaluations e
+        LEFT JOIN users u ON e.evaluator_id = u.id
+        LEFT JOIN applications a ON e.application_id = a.id
+        LEFT JOIN students s ON a.student_id = s.id
+        WHERE e.id = $1
+      `, [parseInt(id)]);
+
+      if (detailsQuery.rows.length > 0) {
+        const details = detailsQuery.rows[0];
+        const evaluatorEmail = details.evaluator_email;
+        const evaluatorName = `${details.evaluator_first_name} ${details.evaluator_last_name}`;
+        const studentName = `${details.student_first_name} ${details.student_paternal_last_name || ''} ${details.student_maternal_last_name || ''}`.trim();
+
+        // Call notification service to send email
+        const notificationUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085';
+        const axios = require('axios');
+
+        axios.post(`${notificationUrl}/api/institutional-emails/evaluation-assignment/${id}`, {
+          evaluatorEmail,
+          evaluatorName,
+          studentName,
+          evaluationType: details.evaluation_type,
+          applicationId: details.application_id
+        }).then(() => {
+          console.log(`✅ Email notification sent to ${evaluatorEmail} for evaluation ${id}`);
+        }).catch(emailError => {
+          console.error(`⚠️ Failed to send email notification for evaluation ${id}:`, emailError.message);
+          // Don't fail the request if email fails - assignment was successful
+        });
+      }
+    } catch (emailError) {
+      console.error('Error sending evaluation assignment email:', emailError);
+      // Don't fail the request if email notification fails
+    }
+
     res.json({
       success: true,
-      message: 'Evaluación asignada exitosamente',
-      data: result.rows[0]
+      message: 'Evaluación asignada exitosamente. Se ha enviado una notificación por email al evaluador.',
+      data: evaluation
     });
   } catch (error) {
     res.status(500).json({
