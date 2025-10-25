@@ -42,27 +42,13 @@ router.post('/document-review/:applicationId', async (req, res) => {
       // Get student name
       studentName = contact.studentName || 'Estudiante';
 
-      // Priority: applicant (who created the application) > guardian > father > mother
+      // ALWAYS use applicant email (person who created the application)
       if (contact.applicantUser?.email) {
         recipientEmail = contact.applicantUser.email;
         guardianName = `${contact.applicantUser.firstName || ''} ${contact.applicantUser.lastName || ''}`.trim() || 'Apoderado/a';
         logger.info(`Using applicant email: ${recipientEmail}`);
-      } else if (contact.guardian?.email) {
-        recipientEmail = contact.guardian.email;
-        guardianName = contact.guardian.fullName || 'Apoderado/a';
-        logger.info(`Using guardian email: ${recipientEmail}`);
-      } else if (contact.father?.email) {
-        recipientEmail = contact.father.email;
-        guardianName = contact.father.fullName || 'Apoderado/a';
-        logger.info(`Using father email: ${recipientEmail}`);
-      } else if (contact.mother?.email) {
-        recipientEmail = contact.mother.email;
-        guardianName = contact.mother.fullName || 'Apoderado/a';
-        logger.info(`Using mother email: ${recipientEmail}`);
-      }
-
-      if (!recipientEmail) {
-        logger.warn(`No email found for application ${applicationId}, using fallback`);
+      } else {
+        logger.warn(`No applicant email found for application ${applicationId}, using fallback`);
         recipientEmail = 'admision@mtn.cl';
       }
     } catch (error) {
@@ -237,46 +223,31 @@ router.post('/status-update/:applicationId', async (req, res) => {
     let studentName = 'el estudiante';
 
     try {
-      logger.info(`Fetching application details from: ${APPLICATION_SERVICE_URL}/api/applications/${applicationId}`);
+      // Use public /contact endpoint instead of full application endpoint
+      logger.info(`Fetching application contact from: ${APPLICATION_SERVICE_URL}/api/applications/${applicationId}/contact`);
 
-      const appResponse = await axios.get(`${APPLICATION_SERVICE_URL}/api/applications/${applicationId}`, {
+      const contactResponse = await axios.get(`${APPLICATION_SERVICE_URL}/api/applications/${applicationId}/contact`, {
         timeout: 5000
       });
 
-      const application = appResponse.data.data;
-      logger.info(`Application data received for ${applicationId}`);
+      const contact = contactResponse.data.data;
+      logger.info(`Contact data received for application ${applicationId}`);
 
       // Get student name
-      if (application.student) {
-        studentName = `${application.student.firstName} ${application.student.paternalLastName}`.trim();
-      }
+      studentName = contact.studentName || 'Estudiante';
 
-      // Priority: applicant (who created the application) > guardian > father > mother
-      if (application.applicantUser?.email) {
-        recipientEmail = application.applicantUser.email;
-        guardianName = `${application.applicantUser.firstName} ${application.applicantUser.lastName}`.trim() || 'Apoderado/a';
+      // ALWAYS use applicant email (person who created the application)
+      if (contact.applicantUser?.email) {
+        recipientEmail = contact.applicantUser.email;
+        guardianName = `${contact.applicantUser.firstName || ''} ${contact.applicantUser.lastName || ''}`.trim() || 'Apoderado/a';
         logger.info(`Using applicant email: ${recipientEmail}`);
-      } else if (application.guardian?.email) {
-        recipientEmail = application.guardian.email;
-        guardianName = application.guardian.fullName || 'Apoderado/a';
-        logger.info(`Using guardian email: ${recipientEmail}`);
-      } else if (application.father?.email) {
-        recipientEmail = application.father.email;
-        guardianName = application.father.fullName || 'Apoderado/a';
-        logger.info(`Using father email: ${recipientEmail}`);
-      } else if (application.mother?.email) {
-        recipientEmail = application.mother.email;
-        guardianName = application.mother.fullName || 'Apoderado/a';
-        logger.info(`Using mother email: ${recipientEmail}`);
-      }
-
-      if (!recipientEmail) {
-        logger.warn(`No email found for application ${applicationId}`);
-        return res.status(400).json(fail('INST_EMAIL_004_NO_EMAIL', 'No email found for this application'));
+      } else {
+        logger.warn(`No applicant email found for application ${applicationId}`);
+        return res.status(400).json(fail('INST_EMAIL_004_NO_EMAIL', 'No applicant email found for this application'));
       }
     } catch (error) {
-      logger.error(`Error fetching application ${applicationId}:`, error.message);
-      return res.status(500).json(fail('INST_EMAIL_004_FETCH_ERROR', 'Error fetching application details', error.message));
+      logger.error(`Error fetching application ${applicationId} contact:`, error.message);
+      return res.status(500).json(fail('INST_EMAIL_004_FETCH_ERROR', 'Error fetching application contact details', error.message));
     }
 
     // Prepare email content based on new status
