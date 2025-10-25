@@ -38,21 +38,22 @@ router.post('/document-review/:applicationId', async (req, res) => {
       logger.info(`Application data received for ${applicationId}`);
 
       // Priority: applicant (who created the application) > guardian > father > mother
-      if (application.applicant?.email) {
-        recipientEmail = application.applicant.email;
-        guardianName = `${application.applicant.firstName} ${application.applicant.lastName}`.trim() || 'Apoderado/a';
+      // Note: Application service returns 'applicantUser' not 'applicant'
+      if (application.applicantUser?.email) {
+        recipientEmail = application.applicantUser.email;
+        guardianName = `${application.applicantUser.firstName} ${application.applicantUser.lastName}`.trim() || 'Apoderado/a';
         logger.info(`Using applicant email: ${recipientEmail}`);
       } else if (application.guardian?.email) {
         recipientEmail = application.guardian.email;
-        guardianName = `${application.guardian.firstName} ${application.guardian.lastName}`.trim() || 'Apoderado/a';
+        guardianName = application.guardian.fullName || 'Apoderado/a';
         logger.info(`Using guardian email: ${recipientEmail}`);
       } else if (application.father?.email) {
         recipientEmail = application.father.email;
-        guardianName = `${application.father.firstName} ${application.father.lastName}`.trim() || 'Apoderado/a';
+        guardianName = application.father.fullName || 'Apoderado/a';
         logger.info(`Using father email: ${recipientEmail}`);
       } else if (application.mother?.email) {
         recipientEmail = application.mother.email;
-        guardianName = `${application.mother.firstName} ${application.mother.lastName}`.trim() || 'Apoderado/a';
+        guardianName = application.mother.fullName || 'Apoderado/a';
         logger.info(`Using mother email: ${recipientEmail}`);
       }
 
