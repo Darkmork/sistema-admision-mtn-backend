@@ -3,6 +3,7 @@ const router = express.Router();
 const { ok, fail } = require('../utils/responseHelpers');
 const logger = require('../utils/logger');
 const emailService = require('../services/EmailService');
+const axios = require('axios');
 
 /**
  * @route   POST /api/institutional-emails/document-review/:applicationId
@@ -21,12 +22,49 @@ router.post('/document-review/:applicationId', async (req, res) => {
       allApproved
     });
 
-    // TODO: Get applicant email from application-service
-    // For now, we'll need to fetch application details
-    // This should be done via inter-service communication
+    // Get applicant email from application-service
+    const APPLICATION_SERVICE_URL = process.env.APPLICATION_SERVICE_URL || 'http://localhost:8083';
+    let recipientEmail = null;
+    let guardianName = 'Apoderado/a';
 
-    // Mock email for testing
-    const recipientEmail = 'test@example.com'; // This should come from the application
+    try {
+      logger.info(`Fetching application details from: ${APPLICATION_SERVICE_URL}/api/applications/${applicationId}`);
+
+      const appResponse = await axios.get(`${APPLICATION_SERVICE_URL}/api/applications/${applicationId}`, {
+        timeout: 5000
+      });
+
+      const application = appResponse.data.data;
+      logger.info(`Application data received for ${applicationId}`);
+
+      // Priority: applicant (who created the application) > guardian > father > mother
+      if (application.applicant?.email) {
+        recipientEmail = application.applicant.email;
+        guardianName = `${application.applicant.firstName} ${application.applicant.lastName}`.trim() || 'Apoderado/a';
+        logger.info(`Using applicant email: ${recipientEmail}`);
+      } else if (application.guardian?.email) {
+        recipientEmail = application.guardian.email;
+        guardianName = `${application.guardian.firstName} ${application.guardian.lastName}`.trim() || 'Apoderado/a';
+        logger.info(`Using guardian email: ${recipientEmail}`);
+      } else if (application.father?.email) {
+        recipientEmail = application.father.email;
+        guardianName = `${application.father.firstName} ${application.father.lastName}`.trim() || 'Apoderado/a';
+        logger.info(`Using father email: ${recipientEmail}`);
+      } else if (application.mother?.email) {
+        recipientEmail = application.mother.email;
+        guardianName = `${application.mother.firstName} ${application.mother.lastName}`.trim() || 'Apoderado/a';
+        logger.info(`Using mother email: ${recipientEmail}`);
+      }
+
+      if (!recipientEmail) {
+        logger.warn(`No email found for application ${applicationId}, using fallback`);
+        recipientEmail = 'admision@mtn.cl';
+      }
+    } catch (error) {
+      logger.error(`Error fetching application ${applicationId}:`, error.message);
+      recipientEmail = 'admision@mtn.cl';
+      logger.warn(`Using fallback email due to error: ${recipientEmail}`);
+    }
 
     // Prepare email content based on review results
     let subject, message;
@@ -34,7 +72,7 @@ router.post('/document-review/:applicationId', async (req, res) => {
     if (allApproved) {
       subject = '✅ Documentos Aprobados - Colegio MTN';
       message = `
-Estimado/a Apoderado/a,
+Estimado/a ${guardianName},
 
 Nos complace informarle que todos los documentos de su postulación han sido revisados y aprobados.
 
@@ -50,7 +88,7 @@ Colegio Monte Tabor y Nazaret
     } else if (rejectedDocuments.length > 0 && approvedDocuments.length > 0) {
       subject = '⚠️ Revisión de Documentos - Acción Requerida - Colegio MTN';
       message = `
-Estimado/a Apoderado/a,
+Estimado/a ${guardianName},
 
 Hemos revisado los documentos de su postulación. Algunos documentos han sido aprobados, pero otros requieren ser actualizados.
 
@@ -69,7 +107,7 @@ Colegio Monte Tabor y Nazaret
     } else if (rejectedDocuments.length > 0) {
       subject = '❌ Documentos Requieren Actualización - Colegio MTN';
       message = `
-Estimado/a Apoderado/a,
+Estimado/a ${guardianName},
 
 Hemos revisado los documentos de su postulación y algunos requieren ser actualizados.
 
