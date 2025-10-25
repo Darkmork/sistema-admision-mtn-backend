@@ -66,6 +66,7 @@ router.post('/document-review/:applicationId', async (req, res) => {
     let recipientEmail = null;
     let guardianName = 'Apoderado/a';
     let studentName = 'Estudiante';
+    let allDocumentsFromDB = [];
 
     try {
       // Use public /contact endpoint instead of full application endpoint
@@ -90,78 +91,163 @@ router.post('/document-review/:applicationId', async (req, res) => {
         logger.warn(`No applicant email found for application ${applicationId}, using fallback`);
         recipientEmail = 'admision@mtn.cl';
       }
+
+      // Get ALL documents from application to show complete status
+      try {
+        const docsResponse = await axios.get(`${APPLICATION_SERVICE_URL}/api/applications/${applicationId}/documents`, {
+          timeout: 5000
+        });
+        allDocumentsFromDB = docsResponse.data.data || [];
+        logger.info(`Retrieved ${allDocumentsFromDB.length} documents from application ${applicationId}`);
+      } catch (docError) {
+        logger.warn(`Could not fetch documents for application ${applicationId}:`, docError.message);
+      }
     } catch (error) {
       logger.error(`Error fetching application ${applicationId} contact:`, error.message);
       recipientEmail = 'admision@mtn.cl';
       logger.warn(`Using fallback email due to error: ${recipientEmail}`);
     }
 
+    // Categorize ALL documents by status
+    const previouslyApprovedDocs = allDocumentsFromDB
+      .filter(doc => doc.approvalStatus === 'APPROVED' && !approvedDocuments.includes(doc.fileName || doc.name))
+      .map(doc => doc.fileName || doc.name || 'Documento');
+
+    const currentlyRejectedDocs = rejectedDocuments;
+    const newlyApprovedDocs = approvedDocuments;
+
     // Prepare email content based on review results
     let subject, message;
 
+    // Combine all approved documents (previously + newly approved)
+    const allApprovedDocsList = [...previouslyApprovedDocs, ...newlyApprovedDocs];
+
     if (allApproved) {
-      subject = '✅ Documentos Aprobados - Colegio MTN';
+      subject = '✅ Todos los Documentos Aprobados - Colegio MTN';
       message = `
-Estimado/a ${guardianName},
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+  <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <h2 style="color: #2d6a4f; margin-top: 0;">✅ Documentos Aprobados</h2>
 
-Nos complace informarle que todos los documentos de su postulación han sido revisados y aprobados.
+    <p style="color: #333; line-height: 1.6;">Estimado/a <strong>${guardianName}</strong>,</p>
 
-📋 **Documentos Aprobados:**
-${approvedDocuments.map(doc => `✓ ${doc}`).join('\n')}
+    <p style="color: #333; line-height: 1.6;">
+      Nos complace informarle que <strong>todos los documentos</strong> de la postulación de
+      <strong>${studentName}</strong> han sido revisados y aprobados exitosamente.
+    </p>
 
-Puede continuar con el siguiente paso del proceso de admisión.
+    <div style="background-color: #d4edda; padding: 20px; border-left: 4px solid #28a745; margin: 20px 0;">
+      <h3 style="color: #155724; margin-top: 0;">📋 Documentos Aprobados (${allApprovedDocsList.length})</h3>
+      <ul style="color: #155724; line-height: 1.8;">
+        ${allApprovedDocsList.map(doc => `<li>✓ ${doc}</li>`).join('')}
+      </ul>
+    </div>
 
-Saludos cordiales,
-Equipo de Admisiones
-Colegio Monte Tabor y Nazaret
+    <p style="color: #333; line-height: 1.6;">
+      <strong>¡Felicitaciones!</strong> Puede continuar con el siguiente paso del proceso de admisión.
+    </p>
+
+    <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+
+    <p style="color: #666; font-size: 14px; line-height: 1.6;">
+      Saludos cordiales,<br>
+      <strong>Equipo de Admisiones</strong><br>
+      Colegio Monte Tabor y Nazaret
+    </p>
+  </div>
+</div>
       `.trim();
-    } else if (rejectedDocuments.length > 0 && approvedDocuments.length > 0) {
-      subject = '⚠️ Revisión de Documentos - Acción Requerida - Colegio MTN';
+    } else if (currentlyRejectedDocs.length > 0) {
+      subject = currentlyRejectedDocs.length === allDocumentsFromDB.length
+        ? '❌ Documentos Requieren Corrección - Colegio MTN'
+        : '⚠️ Revisión de Documentos - Acción Requerida - Colegio MTN';
+
       message = `
-Estimado/a ${guardianName},
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+  <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <h2 style="color: #d9534f; margin-top: 0;">⚠️ Revisión de Documentos</h2>
 
-Hemos revisado los documentos de su postulación. Algunos documentos han sido aprobados, pero otros requieren ser actualizados.
+    <p style="color: #333; line-height: 1.6;">Estimado/a <strong>${guardianName}</strong>,</p>
 
-✅ **Documentos Aprobados:**
-${approvedDocuments.map(doc => `✓ ${doc}`).join('\n')}
+    <p style="color: #333; line-height: 1.6;">
+      Hemos revisado los documentos de la postulación de <strong>${studentName}</strong>.
+      ${allApprovedDocsList.length > 0
+        ? 'Algunos documentos han sido aprobados, pero otros requieren ser actualizados.'
+        : 'Los documentos enviados requieren correcciones.'}
+    </p>
 
-❌ **Documentos Rechazados (requieren actualización):**
-${rejectedDocuments.map(doc => `✗ ${doc}`).join('\n')}
+    ${allApprovedDocsList.length > 0 ? `
+    <div style="background-color: #d4edda; padding: 20px; border-left: 4px solid #28a745; margin: 20px 0;">
+      <h3 style="color: #155724; margin-top: 0;">✅ Documentos Aprobados (${allApprovedDocsList.length})</h3>
+      <ul style="color: #155724; line-height: 1.8;">
+        ${allApprovedDocsList.map(doc => `<li>✓ ${doc}</li>`).join('')}
+      </ul>
+    </div>
+    ` : ''}
 
-Por favor, ingrese al sistema y vuelva a subir los documentos rechazados con las correcciones necesarias.
+    <div style="background-color: #f8d7da; padding: 20px; border-left: 4px solid #dc3545; margin: 20px 0;">
+      <h3 style="color: #721c24; margin-top: 0;">❌ Documentos que Requieren Corrección (${currentlyRejectedDocs.length})</h3>
+      <ul style="color: #721c24; line-height: 1.8;">
+        ${currentlyRejectedDocs.map(doc => `<li>✗ ${doc}</li>`).join('')}
+      </ul>
+    </div>
 
-Saludos cordiales,
-Equipo de Admisiones
-Colegio Monte Tabor y Nazaret
-      `.trim();
-    } else if (rejectedDocuments.length > 0) {
-      subject = '❌ Documentos Requieren Actualización - Colegio MTN';
-      message = `
-Estimado/a ${guardianName},
+    <div style="background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0;">
+      <p style="color: #856404; margin: 0; line-height: 1.6;">
+        <strong>⚠️ Acción Requerida:</strong> Por favor, ingrese al sistema y vuelva a subir los documentos
+        rechazados con las correcciones necesarias.
+      </p>
+    </div>
 
-Hemos revisado los documentos de su postulación y algunos requieren ser actualizados.
+    <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
 
-❌ **Documentos Rechazados (requieren actualización):**
-${rejectedDocuments.map(doc => `✗ ${doc}`).join('\n')}
-
-Por favor, ingrese al sistema y vuelva a subir estos documentos con las correcciones necesarias.
-
-Saludos cordiales,
-Equipo de Admisiones
-Colegio Monte Tabor y Nazaret
+    <p style="color: #666; font-size: 14px; line-height: 1.6;">
+      Saludos cordiales,<br>
+      <strong>Equipo de Admisiones</strong><br>
+      Colegio Monte Tabor y Nazaret
+    </p>
+  </div>
+</div>
       `.trim();
     } else {
-      subject = '📋 Actualización de Documentos - Colegio MTN';
+      // Solo documentos aprobados (sin rechazados)
+      subject = '✅ Documentos Aprobados - Colegio MTN';
       message = `
-Estimado/a Apoderado/a,
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+  <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <h2 style="color: #2d6a4f; margin-top: 0;">✅ Documentos Aprobados</h2>
 
-Le informamos sobre el estado de los documentos de su postulación.
+    <p style="color: #333; line-height: 1.6;">Estimado/a <strong>${guardianName}</strong>,</p>
 
-Por favor, revise su panel de postulante para más detalles.
+    <p style="color: #333; line-height: 1.6;">
+      Le informamos que se han aprobado nuevos documentos de la postulación de <strong>${studentName}</strong>.
+    </p>
 
-Saludos cordiales,
-Equipo de Admisiones
-Colegio Monte Tabor y Nazaret
+    <div style="background-color: #d4edda; padding: 20px; border-left: 4px solid #28a745; margin: 20px 0;">
+      <h3 style="color: #155724; margin-top: 0;">📋 Estado de Documentos</h3>
+
+      ${previouslyApprovedDocs.length > 0 ? `
+      <h4 style="color: #155724; margin-top: 15px;">✓ Documentos Aprobados Anteriormente (${previouslyApprovedDocs.length})</h4>
+      <ul style="color: #155724; line-height: 1.8;">
+        ${previouslyApprovedDocs.map(doc => `<li>${doc}</li>`).join('')}
+      </ul>
+      ` : ''}
+
+      <h4 style="color: #155724; margin-top: 15px;">✓ Nuevos Documentos Aprobados (${newlyApprovedDocs.length})</h4>
+      <ul style="color: #155724; line-height: 1.8;">
+        ${newlyApprovedDocs.map(doc => `<li><strong>${doc}</strong></li>`).join('')}
+      </ul>
+    </div>
+
+    <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+
+    <p style="color: #666; font-size: 14px; line-height: 1.6;">
+      Saludos cordiales,<br>
+      <strong>Equipo de Admisiones</strong><br>
+      Colegio Monte Tabor y Nazaret
+    </p>
+  </div>
+</div>
       `.trim();
     }
 
