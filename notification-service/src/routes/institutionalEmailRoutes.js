@@ -215,27 +215,258 @@ router.post('/interview-invitation/:interviewId', async (req, res) => {
 
 /**
  * @route   POST /api/institutional-emails/status-update/:applicationId
- * @desc    Send status update email
- * @access  Protected
+ * @desc    Send status update email to applicant
+ * @access  Protected (Admin/Coordinator)
+ * @body    { newStatus: string, notes?: string }
  */
 router.post('/status-update/:applicationId', async (req, res) => {
   try {
     const { applicationId } = req.params;
-    const { newStatus } = req.body;
+    const { newStatus, notes } = req.body;
 
     logger.info(`📧 Sending status update email for application ${applicationId}`, { newStatus });
 
-    // TODO: Implement status update email
-    res.json(ok({
-      message: 'Status update email endpoint (not yet implemented)',
-      applicationId,
-      newStatus
-    }));
+    // Get applicant email from application-service
+    const APPLICATION_SERVICE_URL = process.env.APPLICATION_SERVICE_URL || 'http://localhost:8083';
+    let recipientEmail = null;
+    let guardianName = 'Apoderado/a';
+    let studentName = 'el estudiante';
+
+    try {
+      logger.info(`Fetching application details from: ${APPLICATION_SERVICE_URL}/api/applications/${applicationId}`);
+
+      const appResponse = await axios.get(`${APPLICATION_SERVICE_URL}/api/applications/${applicationId}`, {
+        timeout: 5000
+      });
+
+      const application = appResponse.data.data;
+      logger.info(`Application data received for ${applicationId}`);
+
+      // Get student name
+      if (application.student) {
+        studentName = `${application.student.firstName} ${application.student.paternalLastName}`.trim();
+      }
+
+      // Priority: applicant (who created the application) > guardian > father > mother
+      if (application.applicantUser?.email) {
+        recipientEmail = application.applicantUser.email;
+        guardianName = `${application.applicantUser.firstName} ${application.applicantUser.lastName}`.trim() || 'Apoderado/a';
+        logger.info(`Using applicant email: ${recipientEmail}`);
+      } else if (application.guardian?.email) {
+        recipientEmail = application.guardian.email;
+        guardianName = application.guardian.fullName || 'Apoderado/a';
+        logger.info(`Using guardian email: ${recipientEmail}`);
+      } else if (application.father?.email) {
+        recipientEmail = application.father.email;
+        guardianName = application.father.fullName || 'Apoderado/a';
+        logger.info(`Using father email: ${recipientEmail}`);
+      } else if (application.mother?.email) {
+        recipientEmail = application.mother.email;
+        guardianName = application.mother.fullName || 'Apoderado/a';
+        logger.info(`Using mother email: ${recipientEmail}`);
+      }
+
+      if (!recipientEmail) {
+        logger.warn(`No email found for application ${applicationId}`);
+        return res.status(400).json(fail('INST_EMAIL_004_NO_EMAIL', 'No email found for this application'));
+      }
+    } catch (error) {
+      logger.error(`Error fetching application ${applicationId}:`, error.message);
+      return res.status(500).json(fail('INST_EMAIL_004_FETCH_ERROR', 'Error fetching application details', error.message));
+    }
+
+    // Prepare email content based on new status
+    const { subject, message } = generateStatusUpdateEmail(newStatus, guardianName, studentName, notes);
+
+    // Send email using email service
+    try {
+      const result = await emailService.sendEmail(recipientEmail, subject, message);
+
+      logger.info(`✅ Status update email sent for application ${applicationId}`, {
+        messageId: result.messageId,
+        recipient: recipientEmail,
+        newStatus
+      });
+
+      res.json(ok({
+        message: 'Status update email sent successfully',
+        applicationId,
+        newStatus,
+        emailSent: true,
+        recipient: recipientEmail,
+        messageId: result.messageId
+      }));
+    } catch (emailError) {
+      logger.error('❌ Error sending status update email:', emailError);
+
+      // Return success but indicate email failed (so app can continue)
+      res.json(ok({
+        message: 'Status updated but email failed to send',
+        applicationId,
+        newStatus,
+        emailSent: false,
+        error: emailError.message
+      }));
+    }
   } catch (error) {
     logger.error('Error in status-update endpoint:', error);
-    res.status(500).json(fail('INST_EMAIL_004', 'Error sending status update', error.message));
+    res.status(500).json(fail('INST_EMAIL_004', 'Error processing status update notification', error.message));
   }
 });
+
+/**
+ * Helper function to generate email content based on status
+ */
+function generateStatusUpdateEmail(status, guardianName, studentName, notes) {
+  const statusMessages = {
+    'SUBMITTED': {
+      subject: '✅ Postulación Recibida - Colegio MTN',
+      message: `
+Estimado/a ${guardianName},
+
+Hemos recibido exitosamente la postulación de ${studentName}.
+
+📋 **Estado Actual:** Postulación Recibida
+
+Nuestro equipo de admisiones revisará la documentación y nos pondremos en contacto con usted para los siguientes pasos del proceso.
+
+${notes ? `\n**Observaciones:**\n${notes}\n` : ''}
+Saludos cordiales,
+Equipo de Admisiones
+Colegio Monte Tabor y Nazaret
+      `.trim()
+    },
+    'UNDER_REVIEW': {
+      subject: '🔍 Postulación en Revisión - Colegio MTN',
+      message: `
+Estimado/a ${guardianName},
+
+La postulación de ${studentName} se encuentra actualmente en proceso de revisión.
+
+📋 **Estado Actual:** En Revisión
+
+Nuestro equipo está evaluando la documentación presentada. Le notificaremos sobre cualquier actualización o requerimiento adicional.
+
+${notes ? `\n**Observaciones:**\n${notes}\n` : ''}
+Saludos cordiales,
+Equipo de Admisiones
+Colegio Monte Tabor y Nazaret
+      `.trim()
+    },
+    'INTERVIEW_SCHEDULED': {
+      subject: '📅 Entrevista Programada - Colegio MTN',
+      message: `
+Estimado/a ${guardianName},
+
+Nos complace informarle que hemos programado una entrevista para la postulación de ${studentName}.
+
+📋 **Estado Actual:** Entrevista Programada
+
+Recibirá próximamente los detalles de fecha, hora y lugar de la entrevista.
+
+${notes ? `\n**Información Adicional:**\n${notes}\n` : ''}
+Saludos cordiales,
+Equipo de Admisiones
+Colegio Monte Tabor y Nazaret
+      `.trim()
+    },
+    'APPROVED': {
+      subject: '🎉 ¡Postulación Aprobada! - Colegio MTN',
+      message: `
+Estimado/a ${guardianName},
+
+¡Tenemos excelentes noticias! La postulación de ${studentName} ha sido **APROBADA**.
+
+📋 **Estado Actual:** Aprobada
+
+Felicitaciones por este logro. Próximamente recibirá información sobre los siguientes pasos para formalizar la matrícula.
+
+${notes ? `\n**Mensaje del Equipo de Admisiones:**\n${notes}\n` : ''}
+¡Bienvenidos a la familia MTN!
+
+Saludos cordiales,
+Equipo de Admisiones
+Colegio Monte Tabor y Nazaret
+      `.trim()
+    },
+    'REJECTED': {
+      subject: 'Resultado de Postulación - Colegio MTN',
+      message: `
+Estimado/a ${guardianName},
+
+Lamentamos informarle que, tras evaluar la postulación de ${studentName}, no ha sido posible aprobarla en esta oportunidad.
+
+📋 **Estado Actual:** No Aprobada
+
+Esta decisión se basa en diversos criterios del proceso de admisión. Agradecemos sinceramente su interés en nuestro colegio.
+
+${notes ? `\n**Información Adicional:**\n${notes}\n` : ''}
+Le deseamos mucho éxito en su búsqueda educativa.
+
+Saludos cordiales,
+Equipo de Admisiones
+Colegio Monte Tabor y Nazaret
+      `.trim()
+    },
+    'WAITLIST': {
+      subject: '⏳ Postulación en Lista de Espera - Colegio MTN',
+      message: `
+Estimado/a ${guardianName},
+
+La postulación de ${studentName} ha sido incluida en nuestra lista de espera.
+
+📋 **Estado Actual:** Lista de Espera
+
+Esto significa que su postulación cumple con nuestros requisitos, pero actualmente no contamos con cupos disponibles. Le notificaremos si se libera un cupo.
+
+${notes ? `\n**Información Adicional:**\n${notes}\n` : ''}
+Agradecemos su paciencia y comprensión.
+
+Saludos cordiales,
+Equipo de Admisiones
+Colegio Monte Tabor y Nazaret
+      `.trim()
+    },
+    'ARCHIVED': {
+      subject: '📁 Postulación Archivada - Colegio MTN',
+      message: `
+Estimado/a ${guardianName},
+
+La postulación de ${studentName} ha sido archivada.
+
+📋 **Estado Actual:** Archivada
+
+${notes ? `\n**Motivo:**\n${notes}\n` : ''}
+Si tiene alguna consulta, no dude en contactarnos.
+
+Saludos cordiales,
+Equipo de Admisiones
+Colegio Monte Tabor y Nazaret
+      `.trim()
+    }
+  };
+
+  // Default message for unknown statuses
+  const defaultMessage = {
+    subject: 'Actualización de Postulación - Colegio MTN',
+    message: `
+Estimado/a ${guardianName},
+
+Le informamos que el estado de la postulación de ${studentName} ha sido actualizado.
+
+📋 **Estado Actual:** ${status}
+
+${notes ? `\n**Detalles:**\n${notes}\n` : ''}
+Para más información, por favor ingrese a su panel de postulante.
+
+Saludos cordiales,
+Equipo de Admisiones
+Colegio Monte Tabor y Nazaret
+    `.trim()
+  };
+
+  return statusMessages[status] || defaultMessage;
+}
 
 /**
  * @route   POST /api/institutional-emails/document-reminder/:applicationId

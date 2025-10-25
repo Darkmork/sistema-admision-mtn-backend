@@ -4,9 +4,10 @@
  */
 
 const { dbPool } = require('../config/database');
-const { mediumQueryBreaker, writeOperationBreaker } = require('../config/circuitBreakers');
+const { mediumQueryBreaker, writeOperationBreaker, externalServiceBreaker } = require('../config/circuitBreakers');
 const Application = require('../models/Application');
 const logger = require('../utils/logger');
+const axios = require('axios');
 
 class ApplicationService {
   /**
@@ -751,8 +752,56 @@ class ApplicationService {
       }
 
       logger.info(`Updated application ${id} status to ${status}`);
+
+      // Send status update notification email (async - don't wait for result)
+      this.sendStatusUpdateNotification(id, status, notes).catch(error => {
+        logger.error(`Failed to send status update notification for application ${id}:`, error.message);
+        // Don't throw - email failure shouldn't block status update
+      });
+
       return Application.fromDatabaseRow(result.rows[0]);
     });
+  }
+
+  /**
+   * Send status update notification email
+   * This is called asynchronously after status update
+   */
+  async sendStatusUpdateNotification(applicationId, newStatus, notes) {
+    try {
+      const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085';
+      const endpoint = `${NOTIFICATION_SERVICE_URL}/api/institutional-emails/status-update/${applicationId}`;
+
+      logger.info(`📧 Calling notification service for application ${applicationId} status update`, {
+        endpoint,
+        newStatus
+      });
+
+      // Use external service circuit breaker with timeout
+      await externalServiceBreaker.fire(async () => {
+        const response = await axios.post(endpoint, {
+          newStatus,
+          notes
+        }, {
+          timeout: 8000 // Match externalServiceBreaker timeout
+        });
+
+        logger.info(`✅ Notification service responded for application ${applicationId}`, {
+          emailSent: response.data.data?.emailSent,
+          recipient: response.data.data?.recipient
+        });
+
+        return response.data;
+      });
+    } catch (error) {
+      logger.error(`❌ Error calling notification service for application ${applicationId}:`, {
+        error: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      // Re-throw so caller can decide whether to fail or continue
+      throw error;
+    }
   }
 
   /**
