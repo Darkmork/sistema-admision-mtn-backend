@@ -422,18 +422,34 @@ router.post('/:id/assign', authenticate, validateCsrf, requireRole('ADMIN', 'COO
         const notificationUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085';
         const axios = require('axios');
 
+        console.log(`📧 [Evaluation Assignment] Attempting to send email notification`);
+        console.log(`   URL: ${notificationUrl}/api/institutional-emails/evaluation-assignment/${id}`);
+        console.log(`   To: ${evaluatorEmail}`);
+        console.log(`   Evaluator: ${evaluatorName}`);
+        console.log(`   Student: ${studentName}`);
+        console.log(`   Type: ${details.evaluation_type}`);
+
         axios.post(`${notificationUrl}/api/institutional-emails/evaluation-assignment/${id}`, {
           evaluatorEmail,
           evaluatorName,
           studentName,
           evaluationType: details.evaluation_type,
           applicationId: details.application_id
-        }).then(() => {
+        }).then((response) => {
           console.log(`✅ Email notification sent to ${evaluatorEmail} for evaluation ${id}`);
+          console.log(`   Response status: ${response.status}`);
+          console.log(`   Response data:`, response.data);
         }).catch(emailError => {
           console.error(`⚠️ Failed to send email notification for evaluation ${id}:`, emailError.message);
+          console.error(`   Error details:`, {
+            code: emailError.code,
+            status: emailError.response?.status,
+            data: emailError.response?.data
+          });
           // Don't fail the request if email fails - assignment was successful
         });
+      } else {
+        console.log(`⚠️ No details found for evaluation ${id}, skipping email notification`);
       }
     } catch (emailError) {
       console.error('Error sending evaluation assignment email:', emailError);
