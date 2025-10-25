@@ -6,6 +6,45 @@ const emailService = require('../services/EmailService');
 const axios = require('axios');
 
 /**
+ * @route   GET /api/institutional-emails/debug
+ * @desc    Debug endpoint to check configuration
+ */
+router.get('/debug', async (req, res) => {
+  const APPLICATION_SERVICE_URL = process.env.APPLICATION_SERVICE_URL || 'http://localhost:8083';
+
+  try {
+    // Test connection to application-service /contact endpoint
+    const testResponse = await axios.get(`${APPLICATION_SERVICE_URL}/api/applications/2/contact`, {
+      timeout: 5000
+    });
+
+    res.json({
+      success: true,
+      config: {
+        APPLICATION_SERVICE_URL,
+        contactEndpoint: `${APPLICATION_SERVICE_URL}/api/applications/2/contact`,
+        connectionStatus: 'OK'
+      },
+      testResponse: testResponse.data
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      config: {
+        APPLICATION_SERVICE_URL,
+        contactEndpoint: `${APPLICATION_SERVICE_URL}/api/applications/2/contact`,
+        connectionStatus: 'FAILED'
+      },
+      error: {
+        message: error.message,
+        code: error.code,
+        response: error.response?.data
+      }
+    });
+  }
+});
+
+/**
  * @route   POST /api/institutional-emails/document-review/:applicationId
  * @desc    Send document review notification email to applicant
  * @access  Protected (Admin/Coordinator)
