@@ -108,144 +108,348 @@ router.post('/document-review/:applicationId', async (req, res) => {
       logger.warn(`Using fallback email due to error: ${recipientEmail}`);
     }
 
-    // Categorize ALL documents by status
-    const previouslyApprovedDocs = allDocumentsFromDB
-      .filter(doc => doc.approvalStatus === 'APPROVED' && !approvedDocuments.includes(doc.fileName || doc.name))
-      .map(doc => doc.fileName || doc.name || 'Documento');
+    // Categorize ALL documents by status with detailed information
+    const documentStatusList = allDocumentsFromDB.map(doc => {
+      const docName = doc.fileName || doc.name || 'Documento';
 
-    const currentlyRejectedDocs = rejectedDocuments;
-    const newlyApprovedDocs = approvedDocuments;
+      // Check if this document was just approved/rejected in this notification
+      const isNewlyApproved = approvedDocuments.includes(docName);
+      const isNewlyRejected = rejectedDocuments.includes(docName);
+
+      let status = 'PENDING';
+      let isNew = false;
+
+      if (isNewlyApproved) {
+        status = 'APPROVED';
+        isNew = true;
+      } else if (isNewlyRejected) {
+        status = 'REJECTED';
+        isNew = true;
+      } else if (doc.approvalStatus === 'APPROVED') {
+        status = 'APPROVED';
+      } else if (doc.approvalStatus === 'REJECTED') {
+        status = 'REJECTED';
+      }
+
+      return { name: docName, status, isNew };
+    });
+
+    const approvedCount = documentStatusList.filter(d => d.status === 'APPROVED').length;
+    const rejectedCount = documentStatusList.filter(d => d.status === 'REJECTED').length;
+    const pendingCount = documentStatusList.filter(d => d.status === 'PENDING').length;
+    const totalDocs = documentStatusList.length;
 
     // Prepare email content based on review results
     let subject, message;
 
-    // Combine all approved documents (previously + newly approved)
-    const allApprovedDocsList = [...previouslyApprovedDocs, ...newlyApprovedDocs];
-
-    if (allApproved) {
-      subject = '✅ Todos los Documentos Aprobados - Colegio MTN';
+    if (approvedCount === totalDocs && totalDocs > 0) {
+      // TODOS LOS DOCUMENTOS APROBADOS - Mensaje especial de felicitación
+      subject = '🎉 ¡Felicitaciones! Todos los Documentos Aprobados - Colegio MTN';
       message = `
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-  <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-    <h2 style="color: #2d6a4f; margin-top: 0;">✅ Documentos Aprobados</h2>
+<div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+  <!-- Header con logo/banner -->
+  <div style="background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+    <h1 style="color: #ffffff; margin: 0; font-size: 26px;">🎉 ¡Felicitaciones!</h1>
+    <p style="color: #d8f3dc; margin: 10px 0 0 0; font-size: 16px;">Colegio Monte Tabor y Nazaret</p>
+  </div>
 
-    <p style="color: #333; line-height: 1.6;">Estimado/a <strong>${guardianName}</strong>,</p>
-
-    <p style="color: #333; line-height: 1.6;">
-      Nos complace informarle que <strong>todos los documentos</strong> de la postulación de
-      <strong>${studentName}</strong> han sido revisados y aprobados exitosamente.
+  <!-- Contenido principal -->
+  <div style="background-color: #ffffff; padding: 35px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+    <p style="color: #333; font-size: 16px; line-height: 1.8; margin-top: 0;">
+      Estimado/a <strong style="color: #2d6a4f;">${guardianName}</strong>,
     </p>
 
-    <div style="background-color: #d4edda; padding: 20px; border-left: 4px solid #28a745; margin: 20px 0;">
-      <h3 style="color: #155724; margin-top: 0;">📋 Documentos Aprobados (${allApprovedDocsList.length})</h3>
-      <ul style="color: #155724; line-height: 1.8;">
-        ${allApprovedDocsList.map(doc => `<li>✓ ${doc}</li>`).join('')}
-      </ul>
+    <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; border-left: 5px solid #28a745; margin: 25px 0;">
+      <p style="color: #155724; font-size: 17px; font-weight: bold; margin: 0 0 10px 0;">
+        ✅ Excelentes Noticias
+      </p>
+      <p style="color: #155724; margin: 0; line-height: 1.7;">
+        Nos complace informarle que <strong>todos los documentos</strong> de la postulación de
+        <strong>${studentName}</strong> han sido revisados y <strong style="color: #28a745;">APROBADOS exitosamente</strong>.
+      </p>
     </div>
 
-    <p style="color: #333; line-height: 1.6;">
-      <strong>¡Felicitaciones!</strong> Puede continuar con el siguiente paso del proceso de admisión.
-    </p>
+    <!-- Tabla de documentos -->
+    <div style="margin: 30px 0;">
+      <h3 style="color: #2d6a4f; border-bottom: 2px solid #2d6a4f; padding-bottom: 10px; margin-bottom: 20px;">
+        📋 Estado Detallado de Documentos (${totalDocs})
+      </h3>
 
-    <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+      <table style="width: 100%; border-collapse: collapse; background-color: #f9f9f9;">
+        <thead>
+          <tr style="background-color: #2d6a4f; color: white;">
+            <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Estado</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Documento</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${documentStatusList.map((doc, index) => `
+          <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f9f9f9'};">
+            <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">
+              <span style="display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: bold;
+                background-color: #d4edda; color: #155724;">
+                ✓ APROBADO
+              </span>
+            </td>
+            <td style="padding: 12px; border: 1px solid #ddd; color: #333;">
+              ${doc.isNew ? `<strong>${doc.name}</strong> <span style="color: #28a745; font-size: 12px;">(✨ Nuevo)</span>` : doc.name}
+            </td>
+          </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
 
-    <p style="color: #666; font-size: 14px; line-height: 1.6;">
+    <!-- Mensaje de felicitación -->
+    <div style="background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%); padding: 20px; border-radius: 8px; text-align: center; margin: 25px 0;">
+      <p style="color: #000; font-size: 18px; font-weight: bold; margin: 0 0 10px 0;">
+        🏆 ¡Proceso de Documentación Completado!
+      </p>
+      <p style="color: #333; margin: 0; line-height: 1.6;">
+        Puede continuar con el siguiente paso del proceso de admisión.
+      </p>
+    </div>
+
+    <hr style="border: none; border-top: 2px solid #e9ecef; margin: 30px 0;">
+
+    <p style="color: #666; font-size: 14px; line-height: 1.8; margin-bottom: 0;">
       Saludos cordiales,<br>
-      <strong>Equipo de Admisiones</strong><br>
+      <strong style="color: #2d6a4f;">Equipo de Admisiones</strong><br>
       Colegio Monte Tabor y Nazaret
     </p>
   </div>
+
+  <!-- Footer -->
+  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+    <p style="margin: 0;">Este es un correo automático, por favor no responder.</p>
+  </div>
 </div>
       `.trim();
-    } else if (currentlyRejectedDocs.length > 0) {
-      subject = currentlyRejectedDocs.length === allDocumentsFromDB.length
+    } else if (rejectedCount > 0) {
+      // HAY DOCUMENTOS RECHAZADOS - Mostrar estado completo de todos
+      subject = rejectedCount === totalDocs
         ? '❌ Documentos Requieren Corrección - Colegio MTN'
         : '⚠️ Revisión de Documentos - Acción Requerida - Colegio MTN';
 
       message = `
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-  <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-    <h2 style="color: #d9534f; margin-top: 0;">⚠️ Revisión de Documentos</h2>
+<div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+  <!-- Header con logo/banner -->
+  <div style="background: linear-gradient(135deg, #c1121f 0%, #d00000 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+    <h1 style="color: #ffffff; margin: 0; font-size: 26px;">⚠️ Revisión de Documentos</h1>
+    <p style="color: #ffd6d9; margin: 10px 0 0 0; font-size: 16px;">Colegio Monte Tabor y Nazaret</p>
+  </div>
 
-    <p style="color: #333; line-height: 1.6;">Estimado/a <strong>${guardianName}</strong>,</p>
-
-    <p style="color: #333; line-height: 1.6;">
-      Hemos revisado los documentos de la postulación de <strong>${studentName}</strong>.
-      ${allApprovedDocsList.length > 0
-        ? 'Algunos documentos han sido aprobados, pero otros requieren ser actualizados.'
-        : 'Los documentos enviados requieren correcciones.'}
+  <!-- Contenido principal -->
+  <div style="background-color: #ffffff; padding: 35px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+    <p style="color: #333; font-size: 16px; line-height: 1.8; margin-top: 0;">
+      Estimado/a <strong style="color: #2d6a4f;">${guardianName}</strong>,
     </p>
 
-    ${allApprovedDocsList.length > 0 ? `
-    <div style="background-color: #d4edda; padding: 20px; border-left: 4px solid #28a745; margin: 20px 0;">
-      <h3 style="color: #155724; margin-top: 0;">✅ Documentos Aprobados (${allApprovedDocsList.length})</h3>
-      <ul style="color: #155724; line-height: 1.8;">
-        ${allApprovedDocsList.map(doc => `<li>✓ ${doc}</li>`).join('')}
-      </ul>
+    <p style="color: #333; line-height: 1.8;">
+      Hemos revisado los documentos de la postulación de <strong>${studentName}</strong>.
+      ${approvedCount > 0
+        ? `<strong style="color: #28a745;">${approvedCount} documento(s)</strong> han sido aprobados, pero <strong style="color: #dc3545;">${rejectedCount} documento(s)</strong> requieren correcciones.`
+        : `Los <strong style="color: #dc3545;">${rejectedCount} documento(s)</strong> enviados requieren correcciones.`}
+    </p>
+
+    <!-- Resumen de estado -->
+    <div style="display: table; width: 100%; margin: 25px 0; border-radius: 8px; overflow: hidden;">
+      <div style="display: table-row;">
+        <div style="display: table-cell; background-color: #d4edda; padding: 15px; text-align: center; border-right: 2px solid #fff;">
+          <div style="font-size: 28px; font-weight: bold; color: #155724;">${approvedCount}</div>
+          <div style="font-size: 13px; color: #155724;">Aprobados</div>
+        </div>
+        <div style="display: table-cell; background-color: #f8d7da; padding: 15px; text-align: center; border-right: 2px solid #fff;">
+          <div style="font-size: 28px; font-weight: bold; color: #721c24;">${rejectedCount}</div>
+          <div style="font-size: 13px; color: #721c24;">Rechazados</div>
+        </div>
+        <div style="display: table-cell; background-color: #fff3cd; padding: 15px; text-align: center;">
+          <div style="font-size: 28px; font-weight: bold; color: #856404;">${pendingCount}</div>
+          <div style="font-size: 13px; color: #856404;">Pendientes</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla detallada de TODOS los documentos -->
+    <div style="margin: 30px 0;">
+      <h3 style="color: #2d6a4f; border-bottom: 2px solid #2d6a4f; padding-bottom: 10px; margin-bottom: 20px;">
+        📋 Estado Detallado de Todos los Documentos (${totalDocs})
+      </h3>
+
+      <table style="width: 100%; border-collapse: collapse; background-color: #f9f9f9;">
+        <thead>
+          <tr style="background-color: #2d6a4f; color: white;">
+            <th style="padding: 12px; text-align: left; border: 1px solid #ddd; width: 30%;">Estado</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Documento</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${documentStatusList.map((doc, index) => {
+            let statusBadge, bgColor;
+            if (doc.status === 'APPROVED') {
+              statusBadge = '<span style="display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; background-color: #d4edda; color: #155724;">✓ APROBADO</span>';
+              bgColor = index % 2 === 0 ? '#f0fff4' : '#e6f9ed';
+            } else if (doc.status === 'REJECTED') {
+              statusBadge = '<span style="display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; background-color: #f8d7da; color: #721c24;">✗ RECHAZADO</span>';
+              bgColor = index % 2 === 0 ? '#fff5f5' : '#ffe6e6';
+            } else {
+              statusBadge = '<span style="display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; background-color: #fff3cd; color: #856404;">⏱ PENDIENTE</span>';
+              bgColor = index % 2 === 0 ? '#ffffff' : '#fffef0';
+            }
+
+            return `
+          <tr style="background-color: ${bgColor};">
+            <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">
+              ${statusBadge}
+            </td>
+            <td style="padding: 12px; border: 1px solid #ddd; color: #333;">
+              ${doc.isNew ? `<strong>${doc.name}</strong> <span style="color: ${doc.status === 'APPROVED' ? '#28a745' : '#dc3545'}; font-size: 12px;">(✨ Actualizado)</span>` : doc.name}
+            </td>
+          </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mensaje de acción requerida -->
+    ${rejectedCount > 0 ? `
+    <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; border-left: 5px solid #ffc107; margin: 25px 0;">
+      <p style="color: #856404; font-size: 16px; font-weight: bold; margin: 0 0 10px 0;">
+        ⚠️ Acción Requerida
+      </p>
+      <p style="color: #856404; margin: 0; line-height: 1.7;">
+        Por favor, <strong>ingrese al sistema</strong> y vuelva a subir los <strong>${rejectedCount} documento(s) rechazado(s)</strong>
+        con las correcciones necesarias. Una vez corregidos, serán revisados nuevamente.
+      </p>
     </div>
     ` : ''}
 
-    <div style="background-color: #f8d7da; padding: 20px; border-left: 4px solid #dc3545; margin: 20px 0;">
-      <h3 style="color: #721c24; margin-top: 0;">❌ Documentos que Requieren Corrección (${currentlyRejectedDocs.length})</h3>
-      <ul style="color: #721c24; line-height: 1.8;">
-        ${currentlyRejectedDocs.map(doc => `<li>✗ ${doc}</li>`).join('')}
-      </ul>
-    </div>
+    <hr style="border: none; border-top: 2px solid #e9ecef; margin: 30px 0;">
 
-    <div style="background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0;">
-      <p style="color: #856404; margin: 0; line-height: 1.6;">
-        <strong>⚠️ Acción Requerida:</strong> Por favor, ingrese al sistema y vuelva a subir los documentos
-        rechazados con las correcciones necesarias.
-      </p>
-    </div>
-
-    <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-
-    <p style="color: #666; font-size: 14px; line-height: 1.6;">
+    <p style="color: #666; font-size: 14px; line-height: 1.8; margin-bottom: 0;">
       Saludos cordiales,<br>
-      <strong>Equipo de Admisiones</strong><br>
+      <strong style="color: #2d6a4f;">Equipo de Admisiones</strong><br>
       Colegio Monte Tabor y Nazaret
     </p>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+    <p style="margin: 0;">Este es un correo automático, por favor no responder.</p>
   </div>
 </div>
       `.trim();
     } else {
-      // Solo documentos aprobados (sin rechazados)
+      // Solo documentos aprobados (sin rechazados) - Algunos documentos aún pendientes
       subject = '✅ Documentos Aprobados - Colegio MTN';
       message = `
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-  <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-    <h2 style="color: #2d6a4f; margin-top: 0;">✅ Documentos Aprobados</h2>
+<div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+  <!-- Header con logo/banner -->
+  <div style="background: linear-gradient(135deg, #2d6a4f 0%, #52b788 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+    <h1 style="color: #ffffff; margin: 0; font-size: 26px;">✅ Documentos Aprobados</h1>
+    <p style="color: #d8f3dc; margin: 10px 0 0 0; font-size: 16px;">Colegio Monte Tabor y Nazaret</p>
+  </div>
 
-    <p style="color: #333; line-height: 1.6;">Estimado/a <strong>${guardianName}</strong>,</p>
+  <!-- Contenido principal -->
+  <div style="background-color: #ffffff; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
 
-    <p style="color: #333; line-height: 1.6;">
+    <!-- Saludo personalizado -->
+    <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+      Estimado/a <strong style="color: #2d6a4f;">${guardianName}</strong>,
+    </p>
+
+    <p style="color: #555; font-size: 15px; line-height: 1.6; margin-bottom: 25px;">
       Le informamos que se han aprobado nuevos documentos de la postulación de <strong>${studentName}</strong>.
     </p>
 
-    <div style="background-color: #d4edda; padding: 20px; border-left: 4px solid #28a745; margin: 20px 0;">
-      <h3 style="color: #155724; margin-top: 0;">📋 Estado de Documentos</h3>
-
-      ${previouslyApprovedDocs.length > 0 ? `
-      <h4 style="color: #155724; margin-top: 15px;">✓ Documentos Aprobados Anteriormente (${previouslyApprovedDocs.length})</h4>
-      <ul style="color: #155724; line-height: 1.8;">
-        ${previouslyApprovedDocs.map(doc => `<li>${doc}</li>`).join('')}
-      </ul>
-      ` : ''}
-
-      <h4 style="color: #155724; margin-top: 15px;">✓ Nuevos Documentos Aprobados (${newlyApprovedDocs.length})</h4>
-      <ul style="color: #155724; line-height: 1.8;">
-        ${newlyApprovedDocs.map(doc => `<li><strong>${doc}</strong></li>`).join('')}
-      </ul>
+    <!-- Resumen de estado -->
+    <div style="background: linear-gradient(135deg, #d8f3dc 0%, #b7e4c7 100%); padding: 20px; border-radius: 8px; margin-bottom: 25px; text-align: center;">
+      <h3 style="color: #1b4332; margin: 0 0 15px 0; font-size: 18px;">📊 Resumen de Documentos</h3>
+      <div style="display: flex; justify-content: space-around; flex-wrap: wrap;">
+        <div style="margin: 10px;">
+          <p style="margin: 0; color: #1b4332; font-size: 28px; font-weight: bold;">${approvedCount}</p>
+          <p style="margin: 5px 0 0 0; color: #2d6a4f; font-size: 14px;">Aprobados</p>
+        </div>
+        <div style="margin: 10px;">
+          <p style="margin: 0; color: #d4a825; font-size: 28px; font-weight: bold;">${pendingCount}</p>
+          <p style="margin: 5px 0 0 0; color: #856404; font-size: 14px;">Pendientes</p>
+        </div>
+        <div style="margin: 10px;">
+          <p style="margin: 0; color: #1b4332; font-size: 28px; font-weight: bold;">${totalDocs}</p>
+          <p style="margin: 5px 0 0 0; color: #2d6a4f; font-size: 14px;">Total</p>
+        </div>
+      </div>
     </div>
 
-    <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+    <!-- Tabla completa de documentos -->
+    <h3 style="color: #1b4332; margin-bottom: 15px; font-size: 18px;">📋 Estado Detallado de Documentos</h3>
 
-    <p style="color: #666; font-size: 14px; line-height: 1.6;">
-      Saludos cordiales,<br>
-      <strong>Equipo de Admisiones</strong><br>
+    <table style="width: 100%; border-collapse: collapse; background-color: #f9f9f9; margin-bottom: 25px;">
+      <thead>
+        <tr style="background-color: #2d6a4f; color: white;">
+          <th style="padding: 12px; text-align: left; border: 1px solid #ddd; font-size: 14px;">Estado</th>
+          <th style="padding: 12px; text-align: left; border: 1px solid #ddd; font-size: 14px;">Documento</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${documentStatusList.map((doc, index) => {
+          let badgeColor = '#ffc107'; // Pending - yellow
+          let badgeTextColor = '#856404';
+          let badgeText = '⏳ PENDIENTE';
+          let rowBgColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
+
+          if (doc.status === 'APPROVED') {
+            badgeColor = '#d4edda';
+            badgeTextColor = '#155724';
+            badgeText = '✓ APROBADO';
+            rowBgColor = index % 2 === 0 ? '#f1f9f4' : '#e8f5e9'; // Green tint
+          }
+
+          return `
+        <tr style="background-color: ${rowBgColor};">
+          <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">
+            <span style="display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: bold;
+              background-color: ${badgeColor}; color: ${badgeTextColor};">
+              ${badgeText}
+            </span>
+          </td>
+          <td style="padding: 12px; border: 1px solid #ddd; color: #333;">
+            ${doc.isNew ? `<strong>${doc.name}</strong> <span style="color: #28a745; font-size: 12px;">(✨ Nuevo)</span>` : doc.name}
+          </td>
+        </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+
+    ${pendingCount > 0 ? `
+    <!-- Información sobre documentos pendientes -->
+    <div style="background-color: #fff3cd; border-left: 5px solid #ffc107; padding: 20px; border-radius: 5px; margin-bottom: 25px;">
+      <h4 style="color: #856404; margin-top: 0; font-size: 16px;">⏳ Documentos Pendientes</h4>
+      <p style="color: #856404; font-size: 14px; line-height: 1.6; margin: 0;">
+        Aún quedan <strong>${pendingCount} documento(s)</strong> pendientes de revisión.
+        Le notificaremos cuando sean evaluados.
+      </p>
+    </div>
+    ` : ''}
+
+    <!-- Mensaje de cierre -->
+    <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
+
+    <p style="color: #666; font-size: 14px; line-height: 1.6; margin-bottom: 5px;">
+      Saludos cordiales,
+    </p>
+    <p style="color: #2d6a4f; font-size: 15px; font-weight: bold; margin: 0;">
+      Equipo de Admisiones<br>
       Colegio Monte Tabor y Nazaret
     </p>
+
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align: center; padding: 20px; color: #999; font-size: 12px;">
+    <p style="margin: 0;">Este es un correo automático, por favor no responder.</p>
   </div>
 </div>
       `.trim();
