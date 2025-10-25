@@ -832,12 +832,187 @@ Frontend → Gateway → Service A
 
 Future: Consider message queue (RabbitMQ/Kafka) for async operations (notifications, etc.)
 
+## Document Review Email Notification System
+
+### Overview
+
+The notification service implements a comprehensive document review email system that sends professional HTML emails to applicants when admins/coordinators review their documents.
+
+**Key Features:**
+- Professional HTML email templates with responsive design
+- Three email variants based on document status
+- Complete document status tracking (approved/rejected/pending)
+- Sends emails to the person who created the application (applicant)
+- Color-coded status badges and visual hierarchy
+
+### Email Templates
+
+**1. All Documents Approved (Congratulations)**
+- Green gradient header with celebration message
+- Table showing all documents with "APROBADO" badges
+- Gold congratulations box
+- Marks newly approved documents with ✨ icon
+- Subject: `🎉 ¡Felicitaciones! Todos los Documentos Aprobados - Colegio MTN`
+
+**2. Documents with Rejections (Action Required)**
+- Red gradient header for attention
+- Summary counters (approved/rejected/pending)
+- Complete document status table with color-coded rows
+- Yellow warning box indicating action required
+- Subject: `⚠️ Revisión de Documentos - Acción Requerida - Colegio MTN`
+
+**3. Only Approved Documents (Progress Update)**
+- Green gradient header
+- Summary counters (approved/pending)
+- Professional table with status badges
+- Yellow info box for pending documents
+- Subject: `✅ Documentos Aprobados - Colegio MTN`
+
+### Backend Implementation
+
+**Endpoint**: `POST /api/institutional-emails/document-review/:applicationId`
+
+**Location**: `/notification-service/src/routes/institutionalEmailRoutes.js` (lines 9-416)
+
+**Request Body**:
+```json
+{
+  "approvedDocuments": ["Certificado de Nacimiento", "Notas 2024"],
+  "rejectedDocuments": ["Foto del Estudiante"],
+  "allApproved": false
+}
+```
+
+**Email Routing Logic**:
+1. Fetches applicant information from application-service via `/api/applications/:id/contact` endpoint
+2. Determines recipient email (sends ONLY to applicant who created the application)
+3. Fetches all documents from database for complete status
+4. Categorizes documents by status (approved/rejected/pending)
+5. Selects appropriate email template based on document counts
+6. Sends HTML email via SendGrid/SMTP
+
+**CRITICAL Environment Variable**:
+```bash
+APPLICATION_SERVICE_URL=https://application-service-production.up.railway.app
+```
+
+This variable MUST be configured in Railway for notification-service to fetch applicant contact information.
+
+### Frontend Integration
+
+**Current Status**: Backend implementation complete and functional.
+
+**Pending**: Frontend component integration to trigger document review emails when admin/coordinator approves/rejects documents in the dashboard.
+
+**Expected Integration Point**: Admin dashboard → Student detail modal → Document review interface
+
+### Testing Document Review Emails
+
+**Manual Testing** (Postman/curl):
+```bash
+# Test document review email endpoint
+curl -X POST https://gateway-service-production-a753.up.railway.app/api/institutional-emails/document-review/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
+  -d '{
+    "approvedDocuments": ["Certificado de Nacimiento", "Notas 2024"],
+    "rejectedDocuments": ["Foto del Estudiante"],
+    "allApproved": false
+  }'
+```
+
+**Verify Email Sent**:
+- Check notification-service logs for email delivery confirmation
+- Verify recipient email address matches applicant email
+- Check SendGrid dashboard for delivery status
+
+### Public Contact Endpoint
+
+To enable email routing, the application-service provides a public `/contact` endpoint:
+
+**Endpoint**: `GET /api/applications/:id/contact`
+
+**Location**: `/application-service/src/routes/applicationRoutes.js`
+
+**Response Format**:
+```json
+{
+  "success": true,
+  "data": {
+    "applicationId": 1,
+    "applicantUser": {
+      "email": "jorge.gangale@mail.up.cl",
+      "firstName": "Jorge",
+      "lastName": "Gangale"
+    },
+    "guardian": {
+      "email": "guardian@example.com",
+      "fullName": "Guardian Name"
+    },
+    "father": {
+      "email": "father@example.com",
+      "fullName": "Father Name"
+    },
+    "mother": {
+      "email": "mother@example.com",
+      "fullName": "Mother Name"
+    },
+    "studentName": "María González Pérez"
+  }
+}
+```
+
+**Note**: This endpoint is public (no authentication required) to allow notification-service to fetch contact information. It only exposes email addresses and names, no sensitive data.
+
+### Email Design Specifications
+
+**HTML Email Best Practices Implemented:**
+- Inline CSS for maximum email client compatibility
+- Responsive design (max-width: 650px)
+- Professional color scheme (MTN school branding)
+- Table-based layout for document status
+- Clear visual hierarchy with gradients and badges
+- Footer with automatic email disclaimer
+
+**Color Palette:**
+- Green (`#2d6a4f`, `#52b788`): Approved/success states
+- Red (`#c9302c`, `#d73027`): Rejected/action required
+- Yellow (`#ffc107`, `#856404`): Pending/warning
+- Gold (`#ffd700`, `#daa520`): Congratulations
+- Neutral (`#333`, `#666`, `#999`): Text and backgrounds
+
+### Troubleshooting Email Delivery
+
+**Issue: Emails not being sent**
+1. Check `APPLICATION_SERVICE_URL` is configured in Railway
+2. Verify SendGrid API key is valid
+3. Check notification-service logs for errors
+4. Test contact endpoint: `curl https://application-service-production.up.railway.app/api/applications/1/contact`
+
+**Issue: Emails sent to wrong recipient**
+1. Verify applicant email in database: `SELECT * FROM users WHERE id = (SELECT applicant_user_id FROM applications WHERE id = 1)`
+2. Check contact endpoint returns correct applicant email
+3. Review notification-service logs for recipient email address
+
+**Issue: Email formatting broken**
+1. Test email HTML in email testing tool (Litmus, Email on Acid)
+2. Check for missing inline CSS styles
+3. Verify table structure is valid
+4. Test in multiple email clients (Gmail, Outlook, Apple Mail)
+
+### Related Documentation
+
+- **VERIFICACION_CORREOS_DOCUMENTOS.md** - Complete analysis of email notification system (document review vs status change emails)
+- **notification-service/README.md** - Notification service documentation
+- **application-service/README.md** - Application service endpoints
+
 ## Key Documentation Files
 
 ### Security & Deployment
 - **CSRF_IMPLEMENTATION_SUMMARY.md** - Executive summary of CSRF implementation across 4 services
 - **RAILWAY_DEPLOYMENT_CSRF.md** - Detailed Railway deployment guide for CSRF-protected services
 - **FASE-0-ANALISIS.md** - Comprehensive architecture analysis and service inventory
+- **VERIFICACION_CORREOS_DOCUMENTOS.md** - Document review vs status change email system analysis
 
 ### API Contracts
 - **evaluation-service/contracts/** - Interview endpoint contract documentation and validation scripts
@@ -851,7 +1026,15 @@ Each service has its own README with:
 - Testing instructions
 - Deployment notes
 
-**Recent Changes (2025-10-24)**:
+**Recent Changes (2025-10-25)**:
+- **Document Review Email System** - Professional HTML email templates for document review notifications
+  - Three email variants: all approved (congratulations), mixed approved/rejected (action required), only approved (progress)
+  - Complete document status tracking with color-coded badges
+  - Public `/contact` endpoint for fetching applicant email
+  - Configured `APPLICATION_SERVICE_URL` in Railway notification-service
+  - Rollback tag created: `v1.0.0-document-review-emails`
+
+**Previous Changes (2025-10-24)**:
 - **Evaluation duplicate prevention** - Backend validates and prevents duplicate evaluation assignments (409 Conflict)
 - **Evaluation assignment UI blocking** - Frontend modal loads existing evaluations and disables already-assigned types
 - **MaxScore display fix** - All evaluation score displays now use actual maxScore instead of hardcoded /100
