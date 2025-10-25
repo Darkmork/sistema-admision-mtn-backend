@@ -378,6 +378,84 @@ router.delete('/:id', authenticate, validateCsrf, requireRole('ADMIN'), async (r
   }
 });
 
+// GET /api/interviewer-schedules/available - Check available interviewers for specific date/time
+router.get('/available', authenticate, async (req, res) => {
+  try {
+    const { date, time } = req.query;
+
+    if (!date || !time) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requieren los parámetros date (YYYY-MM-DD) y time (HH:MM)'
+      });
+    }
+
+    // Obtener día de la semana de la fecha
+    const dateObj = new Date(date + 'T00:00:00');
+    const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    const dayOfWeek = dayNames[dateObj.getDay()];
+    const year = dateObj.getFullYear();
+
+    // Buscar entrevistadores con horarios que cubran la fecha/hora solicitada
+    const result = await dbPool.query(`
+      SELECT DISTINCT
+        u.id,
+        u.first_name as "firstName",
+        u.last_name as "lastName",
+        u.email,
+        u.role,
+        u.subject
+      FROM users u
+      INNER JOIN interviewer_schedules s ON u.id = s.interviewer_id
+      WHERE u.active = true
+        AND s.is_active = true
+        AND s.year = $1
+        AND (
+          -- Horarios recurrentes que coinciden con el día
+          (s.schedule_type = 'RECURRING' AND s.day_of_week = $2 AND $3::time >= s.start_time AND $3::time < s.end_time)
+          OR
+          -- Horarios de fecha específica
+          (s.schedule_type = 'SPECIFIC_DATE' AND s.specific_date = $4 AND $3::time >= s.start_time AND $3::time < s.end_time)
+        )
+        -- Excluir excepciones (días marcados como no disponibles)
+        AND NOT EXISTS (
+          SELECT 1
+          FROM interviewer_schedules ex
+          WHERE ex.interviewer_id = u.id
+            AND ex.schedule_type = 'EXCEPTION'
+            AND ex.specific_date = $4
+        )
+      ORDER BY u.last_name, u.first_name
+    `, [year, dayOfWeek, time, date]);
+
+    const availableInterviewers = result.rows.map(row => ({
+      id: row.id,
+      firstName: row.firstName,
+      lastName: row.lastName,
+      name: `${row.firstName} ${row.lastName}`,
+      email: row.email,
+      role: row.role,
+      subject: row.subject
+    }));
+
+    res.json({
+      success: true,
+      date,
+      time,
+      dayOfWeek,
+      count: availableInterviewers.length,
+      interviewers: availableInterviewers
+    });
+  } catch (error) {
+    console.error('Error checking interviewer availability:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al verificar disponibilidad de entrevistadores',
+      details: error.message
+    });
+  }
+});
+
 // GET /api/interviewer-schedules/interviewers-with-schedules/:year - Get interviewers with schedules
 router.get('/interviewers-with-schedules/:year', authenticate, async (req, res) => {
   try {
