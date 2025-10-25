@@ -72,10 +72,10 @@ router.get('/:id/contact', async (req, res) => {
         u.last_name as applicant_last_name,
         g.email as guardian_email,
         g.full_name as guardian_full_name,
-        s.father_email,
-        s.father_full_name,
-        s.mother_email,
-        s.mother_full_name,
+        f.email as father_email,
+        f.full_name as father_full_name,
+        m.email as mother_email,
+        m.full_name as mother_full_name,
         s.first_name as student_first_name,
         s.paternal_last_name as student_paternal_last_name,
         s.maternal_last_name as student_maternal_last_name
@@ -83,6 +83,8 @@ router.get('/:id/contact', async (req, res) => {
       LEFT JOIN users u ON a.applicant_user_id = u.id
       LEFT JOIN guardians g ON a.guardian_id = g.id
       LEFT JOIN students s ON a.student_id = s.id
+      LEFT JOIN parents f ON f.id = a.father_id AND f.parent_type = 'FATHER'
+      LEFT JOIN parents m ON m.id = a.mother_id AND m.parent_type = 'MOTHER'
       WHERE a.id = $1`,
       [id]
     );
