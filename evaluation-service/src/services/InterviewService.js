@@ -86,18 +86,18 @@ class InterviewService {
 
       const result = await dbPool.query(
         `INSERT INTO interviews (
-          application_id, interviewer_user_id, type, scheduled_date,
+          application_id, interviewer_user_id, second_interviewer_id, type, scheduled_date,
           scheduled_time, duration, location, mode, status, notes
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING *`,
         [
-          dbData.application_id, dbData.interviewer_user_id, dbData.interview_type,
-          dbData.scheduled_date, dbData.scheduled_time, dbData.duration || 45,
+          dbData.application_id, dbData.interviewer_user_id, interviewData.secondInterviewerId || null,
+          dbData.interview_type, dbData.scheduled_date, dbData.scheduled_time, dbData.duration || 45,
           dbData.location, dbData.mode || 'IN_PERSON', 'SCHEDULED', dbData.notes
         ]
       );
 
-      logger.info(`Created interview ${result.rows[0].id}`);
+      logger.info(`Created interview ${result.rows[0].id}${interviewData.secondInterviewerId ? ` with second interviewer ${interviewData.secondInterviewerId}` : ''}`);
       return Interview.fromDatabaseRow(result.rows[0]);
     });
   }
