@@ -75,25 +75,33 @@ router.get('/', authenticate, InterviewController.getAllInterviews.bind(Intervie
 // GET /api/interviews/statistics - Get interview statistics (MUST BE BEFORE /:id)
 router.get('/statistics', authenticate, async (req, res) => {
   try {
+    console.log('📊 GET /api/interviews/statistics - Fetching interview statistics');
+
     const totalResult = await dbPool.query('SELECT COUNT(*) as count FROM interviews');
+    console.log(`Total interviews: ${totalResult.rows[0].count}`);
+
     const byStatusResult = await dbPool.query(`
       SELECT status, COUNT(*) as count
       FROM interviews
       GROUP BY status
     `);
+    console.log(`By status: ${byStatusResult.rows.length} different statuses`);
+
     const byTypeResult = await dbPool.query(`
       SELECT interview_type as type, COUNT(*) as count
       FROM interviews
       GROUP BY interview_type
     `);
+    console.log(`By type: ${byTypeResult.rows.length} different types`);
 
     const upcomingResult = await dbPool.query(`
       SELECT COUNT(*) as count
       FROM interviews
       WHERE scheduled_date > NOW() AND status IN ('SCHEDULED', 'CONFIRMED')
     `);
+    console.log(`Upcoming interviews: ${upcomingResult.rows[0].count}`);
 
-    res.json({
+    const response = {
       success: true,
       data: {
         total: parseInt(totalResult.rows[0].count),
@@ -107,8 +115,12 @@ router.get('/statistics', authenticate, async (req, res) => {
         }, {}),
         upcoming: parseInt(upcomingResult.rows[0].count)
       }
-    });
+    };
+
+    console.log('✅ Statistics response:', JSON.stringify(response));
+    res.json(response);
   } catch (error) {
+    console.error('❌ Error fetching interview statistics:', error);
     res.status(500).json({
       success: false,
       error: 'Error al obtener estadísticas de entrevistas',
