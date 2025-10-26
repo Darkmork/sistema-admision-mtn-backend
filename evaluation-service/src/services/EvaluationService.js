@@ -88,11 +88,19 @@ class EvaluationService {
           s.current_school as student_current_school,
           u.first_name as evaluator_first_name,
           u.last_name as evaluator_last_name,
-          u.subject as evaluator_subject
+          u.subject as evaluator_subject,
+          f.full_name as father_name,
+          f.email as father_email,
+          f.phone as father_phone,
+          m.full_name as mother_name,
+          m.email as mother_email,
+          m.phone as mother_phone
         FROM evaluations e
         LEFT JOIN applications a ON e.application_id = a.id
         LEFT JOIN students s ON a.student_id = s.id
         LEFT JOIN users u ON e.evaluator_id = u.id
+        LEFT JOIN parents f ON f.id = a.father_id AND f.parent_type = 'FATHER'
+        LEFT JOIN parents m ON m.id = a.mother_id AND m.parent_type = 'MOTHER'
         WHERE e.id = $1
       `;
       const result = await dbPool.query(query, [id]);
@@ -123,7 +131,17 @@ class EvaluationService {
           firstName: row.evaluator_first_name,
           lastName: row.evaluator_last_name,
           subject: row.evaluator_subject
-        }
+        },
+        father: row.father_name ? {
+          name: row.father_name,
+          email: row.father_email,
+          phone: row.father_phone
+        } : null,
+        mother: row.mother_name ? {
+          name: row.mother_name,
+          email: row.mother_email,
+          phone: row.mother_phone
+        } : null
       };
 
       logger.info(`Retrieved evaluation ${id} with student info`);
