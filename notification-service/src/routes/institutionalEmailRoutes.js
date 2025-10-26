@@ -1004,20 +1004,20 @@ router.post('/evaluation-assignment/:evaluationId', async (req, res) => {
  * @desc    Send interview summary email to guardian
  * @access  Public (called by evaluation-service)
  */
-// Send interview summary email to guardian
+// Send interview summary email to applicant or interviewer
 router.post('/interview-summary/:applicationId', async (req, res) => {
   try {
     const { applicationId } = req.params;
-    const { guardianEmail, guardianName, studentName, interviews } = req.body;
+    const { recipientEmail, recipientName, studentName, interviews, isApplicant, isInterviewer } = req.body;
 
-    logger.info(`📧 Sending interview summary email for application ${applicationId}`);
+    logger.info(`📧 Sending interview summary email for application ${applicationId} to ${recipientEmail}`);
 
     // Validation
-    if (!guardianEmail || !guardianName || !studentName || !interviews || !Array.isArray(interviews)) {
+    if (!recipientEmail || !recipientName || !studentName || !interviews || !Array.isArray(interviews)) {
       return res.status(400).json(fail(
         'INST_EMAIL_008',
         'Missing required fields',
-        'guardianEmail, guardianName, studentName, and interviews array are required'
+        'recipientEmail, recipientName, studentName, and interviews array are required'
       ));
     }
 
@@ -1098,10 +1098,15 @@ router.post('/interview-summary/:applicationId', async (req, res) => {
     </div>
 
     <div style="padding: 30px;">
-      <p style="font-size: 16px; margin-bottom: 20px;">Estimado/a ${guardianName},</p>
+      <p style="font-size: 16px; margin-bottom: 20px;">Estimado/a ${recipientName},</p>
 
       <div style="background-color: #e8f4f8; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0; border-radius: 4px;">
-        <p style="margin: 0;"><strong>Se han programado las siguientes entrevistas</strong> para <strong>${studentName}</strong> como parte del proceso de admisión al Colegio Monte Tabor y Nazaret.</p>
+        <p style="margin: 0;">
+          ${isInterviewer
+            ? `<strong>Se le ha asignado</strong> como entrevistador/a para las siguientes entrevistas del estudiante <strong>${studentName}</strong> como parte del proceso de admisión al Colegio Monte Tabor y Nazaret.`
+            : `<strong>Se han programado las siguientes entrevistas</strong> para <strong>${studentName}</strong> como parte del proceso de admisión al Colegio Monte Tabor y Nazaret.`
+          }
+        </p>
       </div>
 
       <div style="background-color: #fff3cd; border: 1px solid #ffc107; padding: 20px; border-radius: 5px; margin: 25px 0;">
@@ -1156,11 +1161,11 @@ router.post('/interview-summary/:applicationId', async (req, res) => {
 
     // Send email
     try {
-      const result = await emailService.sendEmail(guardianEmail, subject, message);
+      const result = await emailService.sendEmail(recipientEmail, subject, message);
 
       logger.info(`✅ Interview summary email sent for application ${applicationId}`, {
         messageId: result.messageId,
-        recipient: guardianEmail,
+        recipient: recipientEmail,
         interviewCount: interviews.length
       });
 
@@ -1168,7 +1173,7 @@ router.post('/interview-summary/:applicationId', async (req, res) => {
         message: 'Interview summary email sent successfully',
         applicationId,
         emailSent: true,
-        recipient: guardianEmail,
+        recipient: recipientEmail,
         messageId: result.messageId,
         interviewCount: interviews.length
       }));
