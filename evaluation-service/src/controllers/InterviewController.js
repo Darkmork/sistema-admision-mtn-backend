@@ -260,7 +260,7 @@ class InterviewController {
     }
   }
 
-  // Send interview summary email to guardian
+  // Send interview summary email to applicant and interviewers
   async sendInterviewSummary(req, res) {
     const axios = require('axios');
     const { dbPool } = require('../config/database');
@@ -277,7 +277,7 @@ class InterviewController {
         return res.status(404).json(fail('INT_012', 'No interviews found for this application'));
       }
 
-      // 2. Get application and student details
+      // 2. Get application, student, and applicant user details
       const appResult = await dbPool.query(`
         SELECT
           a.id as application_id,
@@ -285,11 +285,11 @@ class InterviewController {
           s.first_name,
           s.paternal_last_name,
           s.maternal_last_name,
-          g.email as guardian_email,
-          g.full_name as guardian_full_name
+          u.email as applicant_email,
+          CONCAT(u.first_name, ' ', u.last_name) as applicant_name
         FROM applications a
         JOIN students s ON a.student_id = s.id
-        LEFT JOIN guardians g ON a.guardian_id = g.id
+        LEFT JOIN users u ON a.applicant_user_id = u.id
         WHERE a.id = $1
       `, [applicationId]);
 
@@ -299,16 +299,27 @@ class InterviewController {
 
       const appData = appResult.rows[0];
       const studentName = `${appData.first_name} ${appData.paternal_last_name} ${appData.maternal_last_name || ''}`.trim();
-      const guardianName = appData.guardian_full_name || 'Apoderado';
-      const guardianEmail = appData.guardian_email;
+      const applicantName = appData.applicant_name || 'Apoderado';
+      const applicantEmail = appData.applicant_email;
 
-      if (!guardianEmail) {
-        return res.status(400).json(fail('INT_014', 'No guardian email found for this application'));
+      if (!applicantEmail) {
+        return res.status(400).json(fail('INT_014', 'No applicant email found for this application'));
       }
 
-      // 3. Get interviewer details for each interview
+      // 3. Get interviewer details for each interview and collect unique interviewer IDs
+      const interviewerIds = new Set();
       const interviewsWithDetails = await Promise.all(
         interviews.map(async (interview) => {
+          // Add main interviewer
+          if (interview.interviewerId) {
+            interviewerIds.add(interview.interviewerId);
+          }
+
+          // Add second interviewer if exists
+          if (interview.secondInterviewerId) {
+            interviewerIds.add(interview.secondInterviewerId);
+          }
+
           const interviewerResult = await dbPool.query(`
             SELECT
               CONCAT(first_name, ' ', last_name) as interviewer_name
@@ -329,53 +340,87 @@ class InterviewController {
         })
       );
 
-      // 4. Send email via institutional email endpoint
+      // 4. Get all interviewer emails
+      const interviewerEmailsResult = await dbPool.query(`
+        SELECT id, email, CONCAT(first_name, ' ', last_name) as name
+        FROM users
+        WHERE id = ANY($1)
+      `, [Array.from(interviewerIds)]);
+
+      const interviewerEmails = interviewerEmailsResult.rows;
+
+      // 5. Send email via institutional email endpoint
       const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085';
 
-      const emailData = {
-        guardianEmail,
-        guardianName,
-        studentName,
-        interviews: interviewsWithDetails.map(interview => ({
-          ...interview,
-          scheduledDate: interview.scheduledDate ? new Date(interview.scheduledDate).toLocaleDateString('es-CL', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          }) : 'Fecha no definida',
-          scheduledTime: interview.scheduledTime ? interview.scheduledTime.substring(0, 5) : 'Hora no definida'
-        }))
-      };
+      const formattedInterviews = interviewsWithDetails.map(interview => ({
+        ...interview,
+        scheduledDate: interview.scheduledDate ? new Date(interview.scheduledDate).toLocaleDateString('es-CL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }) : 'Fecha no definida',
+        scheduledTime: interview.scheduledTime ? interview.scheduledTime.substring(0, 5) : 'Hora no definida'
+      }));
 
-      logger.info(`Sending interview summary email to ${guardianEmail}`);
+      const emailsSent = [];
+      const emailsFailed = [];
 
+      // Send to applicant
       try {
-        const notificationResponse = await axios.post(
+        logger.info(`Sending interview summary email to applicant: ${applicantEmail}`);
+
+        await axios.post(
           `${notificationServiceUrl}/api/institutional-emails/interview-summary/${applicationId}`,
-          emailData,
+          {
+            recipientEmail: applicantEmail,
+            recipientName: applicantName,
+            studentName,
+            interviews: formattedInterviews,
+            isApplicant: true
+          },
           { timeout: 10000 }
         );
 
-        logger.info(`Interview summary email sent successfully for application ${applicationId}`);
-
-        return res.json(ok({
-          message: 'Interview summary email sent successfully',
-          emailSent: true,
-          recipientEmail: guardianEmail,
-          interviewCount: interviews.length
-        }));
-
-      } catch (notificationError) {
-        logger.error(`Error calling notification service:`, notificationError.message);
-
-        // Return success but indicate email couldn't be sent
-        return res.status(500).json(fail(
-          'INT_015',
-          'Failed to send email notification',
-          notificationError.message
-        ));
+        emailsSent.push({ email: applicantEmail, name: applicantName, role: 'applicant' });
+      } catch (error) {
+        logger.error(`Failed to send email to applicant ${applicantEmail}:`, error.message);
+        emailsFailed.push({ email: applicantEmail, name: applicantName, role: 'applicant', error: error.message });
       }
+
+      // Send to all interviewers
+      for (const interviewer of interviewerEmails) {
+        try {
+          logger.info(`Sending interview summary email to interviewer: ${interviewer.email}`);
+
+          await axios.post(
+            `${notificationServiceUrl}/api/institutional-emails/interview-summary/${applicationId}`,
+            {
+              recipientEmail: interviewer.email,
+              recipientName: interviewer.name,
+              studentName,
+              interviews: formattedInterviews,
+              isInterviewer: true
+            },
+            { timeout: 10000 }
+          );
+
+          emailsSent.push({ email: interviewer.email, name: interviewer.name, role: 'interviewer' });
+        } catch (error) {
+          logger.error(`Failed to send email to interviewer ${interviewer.email}:`, error.message);
+          emailsFailed.push({ email: interviewer.email, name: interviewer.name, role: 'interviewer', error: error.message });
+        }
+      }
+
+      logger.info(`Interview summary emails sent: ${emailsSent.length} successful, ${emailsFailed.length} failed`);
+
+      return res.json(ok({
+        message: `Interview summary emails sent to ${emailsSent.length} recipients`,
+        emailsSent,
+        emailsFailed,
+        totalRecipients: emailsSent.length + emailsFailed.length,
+        interviewCount: interviews.length
+      }));
 
     } catch (error) {
       logger.error(`Error sending interview summary for application ${req.params.applicationId}:`, error);
