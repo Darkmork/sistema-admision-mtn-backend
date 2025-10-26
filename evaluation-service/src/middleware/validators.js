@@ -33,7 +33,7 @@ const updateEvaluationSchema = Joi.object({
 const createInterviewSchema = Joi.object({
   applicationId: Joi.number().integer().positive().required(),
   interviewerId: Joi.number().integer().positive().required(),
-  secondInterviewerId: Joi.number().integer().positive().allow(null),
+  secondInterviewerId: Joi.number().integer().positive().allow(null).optional(),
   type: Joi.string().valid(
     'FAMILY', 'STUDENT', 'DIRECTOR', 'PSYCHOLOGIST', 'ACADEMIC', 'CYCLE_DIRECTOR'
   ).required(),
@@ -44,7 +44,7 @@ const createInterviewSchema = Joi.object({
   location: Joi.string().max(200).allow('', null),
   status: Joi.string().valid('SCHEDULED', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'RESCHEDULED').default('SCHEDULED'),
   notes: Joi.string().max(1000).allow('', null)
-});
+}).unknown(false);
 
 // Interview update schema
 const updateInterviewSchema = Joi.object({
