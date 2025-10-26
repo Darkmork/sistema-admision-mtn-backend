@@ -828,11 +828,26 @@ router.get('/:id/complementary-form', authenticate, async (req, res) => {
 
     const application = appCheckResult.rows[0];
 
-    // Check if user has access (either the applicant or an admin/coordinator)
-    const hasAccess =
+    // Check if user has access:
+    // 1. The applicant who owns the application
+    // 2. ADMIN or COORDINATOR roles
+    // 3. Professors/evaluators assigned to evaluate this application
+    let hasAccess =
       application.applicant_user_id === userId ||
       req.user.role === 'ADMIN' ||
       req.user.role === 'COORDINATOR';
+
+    // If not already authorized, check if user is an evaluator for this application
+    if (!hasAccess) {
+      const evaluatorCheck = await dbPool.query(
+        `SELECT id FROM evaluations
+         WHERE application_id = $1 AND evaluator_id = $2
+         LIMIT 1`,
+        [applicationId, userId]
+      );
+
+      hasAccess = evaluatorCheck.rows.length > 0;
+    }
 
     if (!hasAccess) {
       return res.status(403).json({
