@@ -3,6 +3,7 @@ class Interview {
     this.id = data.id;
     this.applicationId = data.applicationId || data.application_id;
     this.interviewerId = data.interviewerId || data.interviewer_id || data.interviewer_user_id;
+    this.secondInterviewerId = data.secondInterviewerId || data.second_interviewer_id;
     this.interviewType = data.interviewType || data.interview_type || data.type;
     this.scheduledDate = data.scheduledDate || data.scheduled_date;
     this.scheduledTime = data.scheduledTime || data.scheduled_time;
@@ -21,6 +22,7 @@ class Interview {
       id: this.id,
       applicationId: this.applicationId,
       interviewerId: this.interviewerId,
+      secondInterviewerId: this.secondInterviewerId,
       interviewType: this.interviewType,
       scheduledDate: this.scheduledDate,
       scheduledTime: this.scheduledTime,
@@ -39,6 +41,7 @@ class Interview {
     return {
       application_id: this.applicationId,
       interviewer_user_id: this.interviewerId,
+      second_interviewer_id: this.secondInterviewerId,
       interview_type: this.interviewType,
       scheduled_date: this.scheduledDate,
       scheduled_time: this.scheduledTime,
