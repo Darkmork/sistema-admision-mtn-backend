@@ -101,6 +101,42 @@ class InterviewService {
 
       const createdInterview = Interview.fromDatabaseRow(result.rows[0]);
 
+      // Crear evaluación automáticamente según el tipo de entrevista
+      try {
+        const evaluationType = this.mapInterviewTypeToEvaluationType(dbData.interview_type);
+        logger.info(`Creating evaluation of type ${evaluationType} for interview ${createdInterview.id}`);
+
+        await dbPool.query(
+          `INSERT INTO evaluations (
+            application_id, evaluator_id, evaluation_type, score, max_score,
+            strengths, areas_for_improvement, observations, recommendations, status, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+          RETURNING *`,
+          [
+            dbData.application_id,
+            dbData.interviewer_user_id,
+            evaluationType,
+            0,
+            100,
+            '',
+            '',
+            '',
+            '',
+            'PENDING'
+          ]
+        );
+
+        logger.info(`Created evaluation ${evaluationType} for interview ${createdInterview.id}`);
+      } catch (evalError) {
+        // Si ya existe la evaluación (409), no es un error crítico
+        if (evalError.message && evalError.message.includes('Ya existe')) {
+          logger.warn(`Evaluation already exists for interview ${createdInterview.id}: ${evalError.message}`);
+        } else {
+          logger.error(`Error creating evaluation for interview ${createdInterview.id}:`, evalError);
+          // No lanzar el error para no bloquear la creación de la entrevista
+        }
+      }
+
       // Enviar notificaciones por email (sin bloquear la respuesta)
       this.sendInterviewNotifications(createdInterview, interviewData).catch(err => {
         logger.error(`Error sending interview notifications for interview ${createdInterview.id}:`, err);
@@ -108,6 +144,15 @@ class InterviewService {
 
       return createdInterview;
     });
+  }
+
+  mapInterviewTypeToEvaluationType(interviewType) {
+    const mapping = {
+      'FAMILY': 'FAMILY_INTERVIEW',
+      'CYCLE_DIRECTOR': 'CYCLE_DIRECTOR_INTERVIEW',
+      'INDIVIDUAL': 'PSYCHOLOGICAL_INTERVIEW'
+    };
+    return mapping[interviewType] || 'PSYCHOLOGICAL_INTERVIEW';
   }
 
   async sendInterviewNotifications(interview, interviewData) {
