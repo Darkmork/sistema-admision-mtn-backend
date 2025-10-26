@@ -53,16 +53,22 @@ class InterviewController {
       // Query with JOINs to get student and interviewer info
       const query = `
         SELECT
-          i.*,
+          i.id, i.application_id, i.interviewer_user_id, i.second_interviewer_id,
+          i.type, i.scheduled_date,
+          i.scheduled_time::text as scheduled_time,
+          i.duration, i.location, i.mode, i.status, i.notes, i.cancel_reason,
+          i.created_at, i.updated_at,
           s.first_name,
           s.paternal_last_name,
           s.maternal_last_name,
           CONCAT(u.first_name, ' ', u.last_name) as interviewer_name,
+          CONCAT(u2.first_name, ' ', u2.last_name) as second_interviewer_name,
           s.grade_applied
         FROM interviews i
         LEFT JOIN applications a ON i.application_id = a.id
         LEFT JOIN students s ON a.student_id = s.id
         LEFT JOIN users u ON i.interviewer_user_id = u.id
+        LEFT JOIN users u2 ON i.second_interviewer_id = u2.id
         ${whereClause}
         ORDER BY i.scheduled_date DESC, i.scheduled_time DESC
         LIMIT $${paramIndex++} OFFSET $${paramIndex}
@@ -86,6 +92,7 @@ class InterviewController {
         id: row.id,
         applicationId: row.application_id,
         interviewerId: row.interviewer_user_id,
+        secondInterviewerId: row.second_interviewer_id,
         interviewType: row.type,
         scheduledDate: row.scheduled_date,
         scheduledTime: row.scheduled_time,
@@ -100,6 +107,7 @@ class InterviewController {
         // Additional fields for frontend
         studentName: `${row.first_name} ${row.paternal_last_name} ${row.maternal_last_name || ''}`.trim(),
         interviewerName: row.interviewer_name || 'No asignado',
+        secondInterviewerName: row.second_interviewer_name || null,
         gradeApplied: row.grade_applied
       }));
 
