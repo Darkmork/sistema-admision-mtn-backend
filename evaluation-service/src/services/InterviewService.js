@@ -149,6 +149,42 @@ class InterviewService {
           }
         }
 
+        // Si es entrevista de Director de Ciclo, crear también el CYCLE_DIRECTOR_REPORT
+        // Este informe debe ser asignado SOLO al director de ciclo principal (interviewer_user_id)
+        if (dbData.interview_type === 'CYCLE_DIRECTOR') {
+          try {
+            logger.info(`Creating CYCLE_DIRECTOR_REPORT for primary interviewer ${dbData.interviewer_user_id}`);
+
+            await dbPool.query(
+              `INSERT INTO evaluations (
+                application_id, evaluator_id, evaluation_type, score, max_score,
+                strengths, areas_for_improvement, observations, recommendations, status, created_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+              RETURNING *`,
+              [
+                dbData.application_id,
+                dbData.interviewer_user_id,  // Solo el director principal
+                'CYCLE_DIRECTOR_REPORT',
+                0,
+                100,
+                '',
+                '',
+                `Informe Final Director de Ciclo - Entrevista #${createdInterview.id}`,
+                '',
+                'PENDING'
+              ]
+            );
+
+            logger.info(`Created CYCLE_DIRECTOR_REPORT for evaluator ${dbData.interviewer_user_id} in interview ${createdInterview.id}`);
+          } catch (reportError) {
+            if (reportError.message && reportError.message.includes('Ya existe')) {
+              logger.warn(`CYCLE_DIRECTOR_REPORT already exists for evaluator ${dbData.interviewer_user_id} in interview ${createdInterview.id}`);
+            } else {
+              logger.error(`Error creating CYCLE_DIRECTOR_REPORT for evaluator ${dbData.interviewer_user_id}:`, reportError);
+            }
+          }
+        }
+
         logger.info(`Completed creating evaluations for interview ${createdInterview.id}`);
       } catch (evalError) {
         logger.error(`Error in evaluation creation process for interview ${createdInterview.id}:`, evalError);
