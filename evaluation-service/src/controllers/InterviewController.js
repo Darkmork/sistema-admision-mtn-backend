@@ -329,41 +329,35 @@ class InterviewController {
         })
       );
 
-      // 4. Send email via notification service
+      // 4. Send email via institutional email endpoint
       const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085';
 
       const emailData = {
-        to: guardianEmail,
-        subject: `Resumen de Entrevistas - ${studentName}`,
-        template: 'interview-summary',
-        data: {
-          guardianName,
-          studentName,
-          interviews: interviewsWithDetails.map(interview => ({
-            ...interview,
-            scheduledDate: interview.scheduledDate ? new Date(interview.scheduledDate).toLocaleDateString('es-CL', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            }) : 'Fecha no definida',
-            scheduledTime: interview.scheduledTime ? interview.scheduledTime.substring(0, 5) : 'Hora no definida'
-          })),
-          applicationId,
-          year: new Date().getFullYear()
-        }
+        guardianEmail,
+        guardianName,
+        studentName,
+        interviews: interviewsWithDetails.map(interview => ({
+          ...interview,
+          scheduledDate: interview.scheduledDate ? new Date(interview.scheduledDate).toLocaleDateString('es-CL', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          }) : 'Fecha no definida',
+          scheduledTime: interview.scheduledTime ? interview.scheduledTime.substring(0, 5) : 'Hora no definida'
+        }))
       };
 
-      logger.info(`Sending email to ${guardianEmail} via notification service`);
+      logger.info(`Sending interview summary email to ${guardianEmail}`);
 
       try {
         const notificationResponse = await axios.post(
-          `${notificationServiceUrl}/api/notifications/email`,
+          `${notificationServiceUrl}/api/institutional-emails/interview-summary/${applicationId}`,
           emailData,
           { timeout: 10000 }
         );
 
-        logger.info(`Email sent successfully for application ${applicationId}`);
+        logger.info(`Interview summary email sent successfully for application ${applicationId}`);
 
         return res.json(ok({
           message: 'Interview summary email sent successfully',
