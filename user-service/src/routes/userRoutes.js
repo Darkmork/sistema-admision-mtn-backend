@@ -8,7 +8,7 @@ const BCRYPT_ROUNDS = 8;
 
 // GET /api/users/roles - Get all roles
 router.get('/roles', (req, res) => {
-  const roles = ['ADMIN', 'TEACHER', 'COORDINATOR', 'CYCLE_DIRECTOR', 'PSYCHOLOGIST', 'APODERADO'];
+  const roles = ['ADMIN', 'TEACHER', 'COORDINATOR', 'CYCLE_DIRECTOR', 'PSYCHOLOGIST', 'INTERVIEWER', 'APODERADO'];
   res.json({ roles });
 });
 
@@ -22,7 +22,7 @@ router.get('/public/school-staff', async (req, res) => {
       SELECT id, first_name as "firstName", last_name as "lastName", email, role,
              subject, rut, phone, active, email_verified as "emailVerified"
       FROM users
-      WHERE role IN ('ADMIN', 'TEACHER', 'COORDINATOR', 'CYCLE_DIRECTOR', 'PSYCHOLOGIST')
+      WHERE role IN ('ADMIN', 'TEACHER', 'COORDINATOR', 'CYCLE_DIRECTOR', 'PSYCHOLOGIST', 'INTERVIEWER')
     `;
 
     if (activeOnly === 'true') {
@@ -45,7 +45,7 @@ router.get('/public/school-staff', async (req, res) => {
       phone: user.phone,
       active: user.active,
       emailVerified: user.emailVerified,
-      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
+      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'INTERVIEWER', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
     }));
 
     res.json({
@@ -425,7 +425,7 @@ router.get('/staff', authenticateToken, async (req, res) => {
     const users = result.rows.map(user => ({
       ...user,
       fullName: `${user.firstName} ${user.lastName}`,
-      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
+      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'INTERVIEWER', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
     }));
 
     res.json({
@@ -617,7 +617,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       phone: user.phone,
       active: user.active,
       emailVerified: user.email_verified,
-      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
+      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'INTERVIEWER', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
     });
   } catch (error) {
     res.status(500).json({
