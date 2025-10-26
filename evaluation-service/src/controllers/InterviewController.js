@@ -260,6 +260,7 @@ class InterviewController {
     }
   }
 
+  // Send interview summary email to guardian
   async sendInterviewSummary(req, res) {
     const axios = require('axios');
     const { dbPool } = require('../config/database');
