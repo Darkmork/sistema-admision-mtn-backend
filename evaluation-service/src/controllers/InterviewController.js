@@ -413,6 +413,8 @@ class InterviewController {
       );
 
       // 4. Get all interviewer emails
+      logger.info(`Collected ${interviewerIds.size} unique interviewer IDs: ${Array.from(interviewerIds).join(', ')}`);
+
       const interviewerEmailsResult = await dbPool.query(`
         SELECT id, email, CONCAT(first_name, ' ', last_name) as name
         FROM users
@@ -420,6 +422,7 @@ class InterviewController {
       `, [Array.from(interviewerIds)]);
 
       const interviewerEmails = interviewerEmailsResult.rows;
+      logger.info(`Found ${interviewerEmails.length} interviewer emails: ${interviewerEmails.map(i => i.email).join(', ')}`);
 
       // 5. Send email via institutional email endpoint
       const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085';
