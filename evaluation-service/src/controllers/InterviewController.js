@@ -98,7 +98,7 @@ class InterviewController {
         mode: row.mode,
         status: row.status,
         notes: row.notes,
-        cancelReason: row.cancel_reason,
+        // cancelReason no existe en la tabla interviews
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         // Additional fields for frontend
