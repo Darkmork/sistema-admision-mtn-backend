@@ -101,19 +101,43 @@ router.get('/statistics', authenticate, async (req, res) => {
     `);
     console.log(`Upcoming interviews: ${upcomingResult.rows[0].count}`);
 
+    // Build byStatus object
+    const byStatus = byStatusResult.rows.reduce((acc, row) => {
+      acc[row.status] = parseInt(row.count);
+      return acc;
+    }, {});
+
+    // Build byType object
+    const byType = byTypeResult.rows.reduce((acc, row) => {
+      acc[row.type] = parseInt(row.count);
+      return acc;
+    }, {});
+
+    const total = parseInt(totalResult.rows[0].count);
+    const upcoming = parseInt(upcomingResult.rows[0].count);
+
+    // Calculate completion rate
+    const completed = byStatus['COMPLETED'] || 0;
+    const cancelled = byStatus['CANCELLED'] || 0;
+    const completionRate = total > 0 ? ((completed / total) * 100).toFixed(2) : '0.00';
+    const cancellationRate = total > 0 ? ((cancelled / total) * 100).toFixed(2) : '0.00';
+
     const response = {
       success: true,
       data: {
-        total: parseInt(totalResult.rows[0].count),
-        byStatus: byStatusResult.rows.reduce((acc, row) => {
-          acc[row.status] = parseInt(row.count);
-          return acc;
-        }, {}),
-        byType: byTypeResult.rows.reduce((acc, row) => {
-          acc[row.type] = parseInt(row.count);
-          return acc;
-        }, {}),
-        upcoming: parseInt(upcomingResult.rows[0].count)
+        // Frontend expects overview object with these fields
+        overview: {
+          total: total,
+          scheduled: byStatus['SCHEDULED'] || 0,
+          completed: completed,
+          cancelled: cancelled,
+          upcoming: upcoming,
+          completionRate: completionRate,
+          cancellationRate: cancellationRate
+        },
+        byStatus: byStatus,
+        byType: byType,
+        upcoming: upcoming
       }
     };
 
