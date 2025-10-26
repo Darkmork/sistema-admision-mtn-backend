@@ -102,39 +102,57 @@ class InterviewService {
       const createdInterview = Interview.fromDatabaseRow(result.rows[0]);
 
       // Crear evaluación automáticamente según el tipo de entrevista
+      // IMPORTANTE: Crear una evaluación por cada participante (entrevistador principal + segundo entrevistador)
       try {
         const evaluationType = this.mapInterviewTypeToEvaluationType(dbData.interview_type);
-        logger.info(`Creating evaluation of type ${evaluationType} for interview ${createdInterview.id}`);
+        const interviewers = [dbData.interviewer_user_id];
 
-        await dbPool.query(
-          `INSERT INTO evaluations (
-            application_id, evaluator_id, evaluation_type, score, max_score,
-            strengths, areas_for_improvement, observations, recommendations, status, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
-          RETURNING *`,
-          [
-            dbData.application_id,
-            dbData.interviewer_user_id,
-            evaluationType,
-            0,
-            100,
-            '',
-            '',
-            '',
-            '',
-            'PENDING'
-          ]
-        );
-
-        logger.info(`Created evaluation ${evaluationType} for interview ${createdInterview.id}`);
-      } catch (evalError) {
-        // Si ya existe la evaluación (409), no es un error crítico
-        if (evalError.message && evalError.message.includes('Ya existe')) {
-          logger.warn(`Evaluation already exists for interview ${createdInterview.id}: ${evalError.message}`);
-        } else {
-          logger.error(`Error creating evaluation for interview ${createdInterview.id}:`, evalError);
-          // No lanzar el error para no bloquear la creación de la entrevista
+        // Si hay segundo entrevistador, agregarlo a la lista
+        if (interviewData.secondInterviewerId) {
+          interviewers.push(interviewData.secondInterviewerId);
         }
+
+        logger.info(`Creating ${interviewers.length} evaluation(s) of type ${evaluationType} for interview ${createdInterview.id}`);
+
+        // Crear una evaluación para cada entrevistador
+        for (const evaluatorId of interviewers) {
+          try {
+            await dbPool.query(
+              `INSERT INTO evaluations (
+                application_id, evaluator_id, evaluation_type, score, max_score,
+                strengths, areas_for_improvement, observations, recommendations, status, created_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+              RETURNING *`,
+              [
+                dbData.application_id,
+                evaluatorId,
+                evaluationType,
+                0,
+                100,
+                '',
+                '',
+                '',
+                '',
+                'PENDING'
+              ]
+            );
+
+            logger.info(`Created evaluation ${evaluationType} for evaluator ${evaluatorId} in interview ${createdInterview.id}`);
+          } catch (evalError) {
+            // Si ya existe la evaluación para este evaluador, no es un error crítico
+            if (evalError.message && evalError.message.includes('Ya existe')) {
+              logger.warn(`Evaluation already exists for evaluator ${evaluatorId} in interview ${createdInterview.id}`);
+            } else {
+              logger.error(`Error creating evaluation for evaluator ${evaluatorId} in interview ${createdInterview.id}:`, evalError);
+              // Continuar con el siguiente evaluador
+            }
+          }
+        }
+
+        logger.info(`Completed creating evaluations for interview ${createdInterview.id}`);
+      } catch (evalError) {
+        logger.error(`Error in evaluation creation process for interview ${createdInterview.id}:`, evalError);
+        // No lanzar el error para no bloquear la creación de la entrevista
       }
 
       // Enviar notificaciones por email (sin bloquear la respuesta)
