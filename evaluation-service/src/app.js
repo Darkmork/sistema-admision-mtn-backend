@@ -146,6 +146,46 @@ app.post('/api/fix-schema-interviewer-schedules', async (req, res) => {
   }
 });
 
+// Temporary endpoint to fix interview type constraint
+app.post('/api/fix-interview-type-constraint', async (req, res) => {
+  try {
+    const { dbPool } = require('./config/database');
+
+    // Drop old constraint
+    await dbPool.query('ALTER TABLE interviews DROP CONSTRAINT IF EXISTS interviews_type_check;');
+    logger.info('✅ Dropped old interviews_type_check constraint');
+
+    // Add new constraint with CYCLE_DIRECTOR included
+    await dbPool.query(`
+      ALTER TABLE interviews
+      ADD CONSTRAINT interviews_type_check
+      CHECK (type IN ('FAMILY', 'STUDENT', 'DIRECTOR', 'PSYCHOLOGIST', 'ACADEMIC', 'CYCLE_DIRECTOR'));
+    `);
+    logger.info('✅ Added new constraint with CYCLE_DIRECTOR');
+
+    // Verify changes
+    const result = await dbPool.query(`
+      SELECT conname, pg_get_constraintdef(oid) as definition
+      FROM pg_constraint
+      WHERE conrelid = 'interviews'::regclass
+        AND conname = 'interviews_type_check';
+    `);
+
+    res.json({
+      success: true,
+      message: 'Interview type constraint fixed successfully',
+      constraint: result.rows[0]
+    });
+  } catch (error) {
+    logger.error('Error fixing interview type constraint:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error fixing interview type constraint',
+      details: error.message
+    });
+  }
+});
+
 // Routes
 app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/interviews', interviewRoutes);
