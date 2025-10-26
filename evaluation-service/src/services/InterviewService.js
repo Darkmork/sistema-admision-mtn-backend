@@ -98,8 +98,184 @@ class InterviewService {
       );
 
       logger.info(`Created interview ${result.rows[0].id}${interviewData.secondInterviewerId ? ` with second interviewer ${interviewData.secondInterviewerId}` : ''}`);
-      return Interview.fromDatabaseRow(result.rows[0]);
+
+      const createdInterview = Interview.fromDatabaseRow(result.rows[0]);
+
+      // Enviar notificaciones por email (sin bloquear la respuesta)
+      this.sendInterviewNotifications(createdInterview, interviewData).catch(err => {
+        logger.error(`Error sending interview notifications for interview ${createdInterview.id}:`, err);
+      });
+
+      return createdInterview;
     });
+  }
+
+  async sendInterviewNotifications(interview, interviewData) {
+    const axios = require('axios');
+    const { dbPool } = require('../config/database');
+
+    try {
+      logger.info(`Sending notifications for interview ${interview.id}`);
+
+      // 1. Obtener información de la aplicación, estudiante y apoderado
+      const appResult = await dbPool.query(`
+        SELECT
+          a.id as application_id,
+          s.id as student_id,
+          s.first_name as student_first_name,
+          s.paternal_last_name as student_paternal_last_name,
+          s.maternal_last_name as student_maternal_last_name,
+          g.id as guardian_id,
+          g.email as guardian_email,
+          g.first_name as guardian_first_name,
+          g.last_name as guardian_last_name
+        FROM applications a
+        JOIN students s ON a.student_id = s.id
+        LEFT JOIN guardians g ON a.guardian_id = g.id
+        WHERE a.id = $1
+      `, [interview.applicationId]);
+
+      if (appResult.rows.length === 0) {
+        logger.warn(`Application ${interview.applicationId} not found for interview ${interview.id}`);
+        return;
+      }
+
+      const appData = appResult.rows[0];
+      const studentName = `${appData.student_first_name} ${appData.student_paternal_last_name} ${appData.student_maternal_last_name || ''}`.trim();
+
+      // 2. Obtener información de los entrevistadores
+      const interviewerIds = [interview.interviewerId];
+      if (interviewData.secondInterviewerId) {
+        interviewerIds.push(interviewData.secondInterviewerId);
+      }
+
+      const interviewersResult = await dbPool.query(`
+        SELECT id, email, first_name, last_name, role
+        FROM users
+        WHERE id = ANY($1)
+      `, [interviewerIds]);
+
+      const interviewers = interviewersResult.rows;
+      const mainInterviewer = interviewers.find(i => i.id === interview.interviewerId);
+      const secondInterviewer = interviewers.find(i => i.id === interviewData.secondInterviewerId);
+
+      // 3. Preparar datos comunes del email
+      const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085';
+
+      const interviewTypeLabels = {
+        'FAMILY': 'Entrevista Familiar',
+        'STUDENT': 'Entrevista al Estudiante',
+        'DIRECTOR': 'Entrevista con Director',
+        'PSYCHOLOGIST': 'Entrevista Psicológica',
+        'ACADEMIC': 'Entrevista Académica',
+        'CYCLE_DIRECTOR': 'Entrevista Director de Ciclo'
+      };
+
+      const commonData = {
+        studentName,
+        interviewTypeLabel: interviewTypeLabels[interview.interviewType] || interview.interviewType,
+        interviewDate: new Date(interview.scheduledDate).toLocaleDateString('es-CL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        interviewTime: interview.scheduledTime ? interview.scheduledTime.substring(0, 5) : 'No especificada',
+        duration: interview.duration || 60,
+        location: interview.location || 'Por confirmar',
+        isVirtual: interview.mode === 'VIRTUAL',
+        virtualLink: interview.mode === 'VIRTUAL' ? interviewData.virtualMeetingLink : null,
+        notes: interview.notes || '',
+        year: new Date().getFullYear(),
+        portalUrl: process.env.PORTAL_URL || 'https://admision.mtn.cl'
+      };
+
+      // 4. Enviar email al apoderado
+      if (appData.guardian_email) {
+        const guardianEmail = {
+          to: appData.guardian_email,
+          subject: `Entrevista Programada - ${studentName}`,
+          template: 'interview-scheduled',
+          data: {
+            ...commonData,
+            isGuardian: true,
+            recipientName: `${appData.guardian_first_name} ${appData.guardian_last_name}`.trim(),
+            interviewer: mainInterviewer ? `${mainInterviewer.first_name} ${mainInterviewer.last_name}` : 'Por asignar',
+            secondInterviewer: secondInterviewer ? `${secondInterviewer.first_name} ${secondInterviewer.last_name}` : null
+          }
+        };
+
+        try {
+          await axios.post(
+            `${notificationServiceUrl}/api/notifications/email`,
+            guardianEmail,
+            { timeout: 10000 }
+          );
+          logger.info(`Email sent to guardian ${appData.guardian_email} for interview ${interview.id}`);
+        } catch (error) {
+          logger.error(`Failed to send email to guardian ${appData.guardian_email}:`, error.message);
+        }
+      }
+
+      // 5. Enviar email al entrevistador principal
+      if (mainInterviewer && mainInterviewer.email) {
+        const interviewerEmail = {
+          to: mainInterviewer.email,
+          subject: `Nueva Entrevista Asignada - ${studentName}`,
+          template: 'interview-scheduled',
+          data: {
+            ...commonData,
+            isGuardian: false,
+            recipientName: `${mainInterviewer.first_name} ${mainInterviewer.last_name}`,
+            interviewer: `${mainInterviewer.first_name} ${mainInterviewer.last_name}`,
+            secondInterviewer: secondInterviewer ? `${secondInterviewer.first_name} ${secondInterviewer.last_name}` : null
+          }
+        };
+
+        try {
+          await axios.post(
+            `${notificationServiceUrl}/api/notifications/email`,
+            interviewerEmail,
+            { timeout: 10000 }
+          );
+          logger.info(`Email sent to interviewer ${mainInterviewer.email} for interview ${interview.id}`);
+        } catch (error) {
+          logger.error(`Failed to send email to interviewer ${mainInterviewer.email}:`, error.message);
+        }
+      }
+
+      // 6. Enviar email al segundo entrevistador (si existe)
+      if (secondInterviewer && secondInterviewer.email) {
+        const secondInterviewerEmail = {
+          to: secondInterviewer.email,
+          subject: `Nueva Entrevista Asignada - ${studentName}`,
+          template: 'interview-scheduled',
+          data: {
+            ...commonData,
+            isGuardian: false,
+            recipientName: `${secondInterviewer.first_name} ${secondInterviewer.last_name}`,
+            interviewer: `${mainInterviewer.first_name} ${mainInterviewer.last_name}`,
+            secondInterviewer: `${secondInterviewer.first_name} ${secondInterviewer.last_name}`
+          }
+        };
+
+        try {
+          await axios.post(
+            `${notificationServiceUrl}/api/notifications/email`,
+            secondInterviewerEmail,
+            { timeout: 10000 }
+          );
+          logger.info(`Email sent to second interviewer ${secondInterviewer.email} for interview ${interview.id}`);
+        } catch (error) {
+          logger.error(`Failed to send email to second interviewer ${secondInterviewer.email}:`, error.message);
+        }
+      }
+
+      logger.info(`All notifications sent successfully for interview ${interview.id}`);
+    } catch (error) {
+      logger.error(`Error in sendInterviewNotifications for interview ${interview.id}:`, error);
+      throw error;
+    }
   }
 
   async updateInterview(id, updateData) {

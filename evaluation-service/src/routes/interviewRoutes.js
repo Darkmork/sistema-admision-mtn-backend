@@ -198,6 +198,62 @@ router.get('/calendar', authenticate, async (req, res) => {
 // GET /api/interviews/application/:applicationId - MUST BE BEFORE /:id
 router.get('/application/:applicationId', authenticate, InterviewController.getInterviewsByApplicationId.bind(InterviewController));
 
+// GET /api/interviews/interviewer/:interviewerId - Get interviews by interviewer (MUST BE BEFORE /:id)
+router.get('/interviewer/:interviewerId', authenticate, async (req, res) => {
+  try {
+    const { interviewerId } = req.params;
+    const { dbPool } = require('../config/database');
+
+    // Query to get interviews where user is interviewer or second interviewer
+    const query = `
+      SELECT
+        i.*,
+        i.scheduled_time::text as scheduled_time_text,
+        s.first_name,
+        s.paternal_last_name,
+        s.maternal_last_name,
+        CONCAT(u.first_name, ' ', u.last_name) as interviewer_name,
+        CONCAT(u2.first_name, ' ', u2.last_name) as second_interviewer_name,
+        s.grade_applied
+      FROM interviews i
+      LEFT JOIN applications a ON i.application_id = a.id
+      LEFT JOIN students s ON a.student_id = s.id
+      LEFT JOIN users u ON i.interviewer_user_id = u.id
+      LEFT JOIN users u2 ON i.second_interviewer_id = u2.id
+      WHERE i.interviewer_user_id = $1 OR i.second_interviewer_id = $1
+      ORDER BY i.scheduled_date DESC, i.scheduled_time DESC
+    `;
+
+    const result = await dbPool.query(query, [parseInt(interviewerId)]);
+
+    const interviews = result.rows.map(row => ({
+      id: row.id,
+      applicationId: row.application_id,
+      interviewerId: row.interviewer_user_id,
+      secondInterviewerId: row.second_interviewer_id,
+      interviewType: row.type,
+      scheduledDate: row.scheduled_date,
+      scheduledTime: row.scheduled_time_text || row.scheduled_time,
+      duration: row.duration,
+      location: row.location,
+      mode: row.mode,
+      status: row.status,
+      notes: row.notes,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      studentName: `${row.first_name} ${row.paternal_last_name} ${row.maternal_last_name || ''}`.trim(),
+      interviewerName: row.interviewer_name || 'No asignado',
+      secondInterviewerName: row.second_interviewer_name || null,
+      gradeApplied: row.grade_applied
+    }));
+
+    return res.json(interviews);
+  } catch (error) {
+    logger.error(`Error getting interviews for interviewer ${req.params.interviewerId}:`, error);
+    return res.status(500).json({ error: 'Failed to retrieve interviews', message: error.message });
+  }
+});
+
 // POST /api/interviews/application/:applicationId/send-summary - Send interview summary via email
 router.post('/application/:applicationId/send-summary', authenticate, validateCsrf, InterviewController.sendInterviewSummary.bind(InterviewController));
 
