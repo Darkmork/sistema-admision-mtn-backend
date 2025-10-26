@@ -173,6 +173,15 @@ class InterviewController {
     } catch (error) {
       logger.error('Error creating interview:', error);
 
+      // Handle CHECK constraint violation for interview type
+      if (error.code === '23514' && error.constraint === 'interviews_type_check') {
+        return res.status(400).json(fail(
+          'INT_012',
+          'Tipo de entrevista no válido. La base de datos necesita ser actualizada para soportar CYCLE_DIRECTOR.',
+          `Invalid interview type: ${req.body.type}. Database constraint needs to be updated.`
+        ));
+      }
+
       // Handle duplicate key error (unique constraint violation)
       if (error.code === '23505' && error.constraint === 'unique_interviewer_datetime') {
         return res.status(409).json(fail(
