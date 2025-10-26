@@ -999,4 +999,193 @@ router.post('/evaluation-assignment/:evaluationId', async (req, res) => {
   }
 });
 
+/**
+ * @route   POST /api/institutional-emails/interview-summary/:applicationId
+ * @desc    Send interview summary email to guardian
+ * @access  Public (called by evaluation-service)
+ */
+router.post('/interview-summary/:applicationId', async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const { guardianEmail, guardianName, studentName, interviews } = req.body;
+
+    logger.info(`📧 Sending interview summary email for application ${applicationId}`);
+
+    // Validation
+    if (!guardianEmail || !guardianName || !studentName || !interviews || !Array.isArray(interviews)) {
+      return res.status(400).json(fail(
+        'INST_EMAIL_008',
+        'Missing required fields',
+        'guardianEmail, guardianName, studentName, and interviews array are required'
+      ));
+    }
+
+    const currentYear = new Date().getFullYear();
+
+    // Email subject
+    const subject = `📋 Resumen de Entrevistas - ${studentName}`;
+
+    // Build interview cards HTML
+    const interviewCardsHTML = interviews.map(interview => {
+      const interviewTypeLabels = {
+        'FAMILY': '👨‍👩‍👧 Entrevista Familiar',
+        'STUDENT': '👨‍🎓 Entrevista al Estudiante',
+        'DIRECTOR': '👔 Entrevista con Director',
+        'PSYCHOLOGIST': '🧠 Entrevista Psicológica',
+        'ACADEMIC': '📚 Entrevista Académica',
+        'CYCLE_DIRECTOR': '🎯 Entrevista Director de Ciclo'
+      };
+
+      const interviewLabel = interviewTypeLabels[interview.type] || `📋 ${interview.type}`;
+      const isVirtual = interview.mode === 'VIRTUAL';
+
+      return `
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="margin: 0 0 15px 0; font-size: 18px; border-bottom: 2px solid rgba(255,255,255,0.3); padding-bottom: 10px;">
+          ${interviewLabel}
+        </h3>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px;">
+          <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 4px;">
+            <div style="font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📅 Fecha</div>
+            <div style="font-size: 15px; font-weight: bold;">${interview.scheduledDate}</div>
+          </div>
+
+          <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 4px;">
+            <div style="font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">🕐 Hora</div>
+            <div style="font-size: 15px; font-weight: bold;">${interview.scheduledTime}</div>
+          </div>
+
+          <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 4px;">
+            <div style="font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">⏱️ Duración</div>
+            <div style="font-size: 15px; font-weight: bold;">${interview.duration} min</div>
+          </div>
+
+          <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 4px;">
+            <div style="font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">${isVirtual ? '💻' : '📍'} Modalidad</div>
+            <div style="font-size: 15px; font-weight: bold;">${isVirtual ? 'Virtual' : 'Presencial'}</div>
+          </div>
+
+          <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 4px; grid-column: 1 / -1;">
+            <div style="font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">👨‍🏫 Entrevistador</div>
+            <div style="font-size: 15px; font-weight: bold;">${interview.interviewerName}</div>
+          </div>
+
+          ${interview.location ? `
+          <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 4px; grid-column: 1 / -1;">
+            <div style="font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📍 Lugar</div>
+            <div style="font-size: 15px; font-weight: bold;">${interview.location}</div>
+          </div>
+          ` : ''}
+
+          <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 4px; grid-column: 1 / -1;">
+            <div style="font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📌 Estado</div>
+            <div style="font-size: 15px; font-weight: bold;">${interview.status}</div>
+          </div>
+        </div>
+      </div>
+      `;
+    }).join('');
+
+    // Email HTML message
+    const message = `
+<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;">
+  <div style="background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <div style="background: linear-gradient(135deg, #003366 0%, #004d99 100%); color: white; padding: 30px 20px; text-align: center;">
+      <h1 style="margin: 0; font-size: 26px;">📋 Resumen de Entrevistas</h1>
+      <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 14px;">${studentName} - Proceso de Admisión ${currentYear}</p>
+    </div>
+
+    <div style="padding: 30px;">
+      <p style="font-size: 16px; margin-bottom: 20px;">Estimado/a ${guardianName},</p>
+
+      <div style="background-color: #e8f4f8; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;"><strong>Se han programado las siguientes entrevistas</strong> para <strong>${studentName}</strong> como parte del proceso de admisión al Colegio Monte Tabor y Nazaret.</p>
+      </div>
+
+      <div style="background-color: #fff3cd; border: 1px solid #ffc107; padding: 20px; border-radius: 5px; margin: 25px 0;">
+        <h3 style="margin-top: 0; color: #856404;">📊 Resumen General</h3>
+        <div style="text-align: center;">
+          <div style="display: inline-block; margin: 10px 20px;">
+            <div style="font-size: 28px; font-weight: bold; color: #003366;">${interviews.length}</div>
+            <div style="font-size: 12px; color: #666; text-transform: uppercase;">Entrevistas Totales</div>
+          </div>
+          <div style="display: inline-block; margin: 10px 20px;">
+            <div style="font-size: 28px; font-weight: bold; color: #003366;">#${applicationId}</div>
+            <div style="font-size: 12px; color: #666; text-transform: uppercase;">ID Aplicación</div>
+          </div>
+        </div>
+      </div>
+
+      <h2 style="color: #003366; margin-top: 30px;">📅 Entrevistas Programadas</h2>
+
+      ${interviewCardsHTML}
+
+      <div style="background-color: #e8f4f8; border-left: 4px solid #17a2b8; padding: 20px; margin: 25px 0; border-radius: 4px;">
+        <h3 style="margin-top: 0; color: #0c5460;">ℹ️ Información Importante</h3>
+        <ul style="margin: 10px 0; padding-left: 20px; color: #0c5460;">
+          <li>Por favor llegue <strong>10 minutos antes</strong> de cada entrevista</li>
+          <li>Traiga los <strong>documentos solicitados</strong> (cédula de identidad, certificados académicos, etc.)</li>
+          <li>Para entrevistas virtuales, recibirá el link de conexión por separado</li>
+          <li>Si necesita <strong>reprogramar</strong> alguna entrevista, contáctenos con al menos <strong>48 horas de anticipación</strong></li>
+          <li>Cualquier consulta, puede comunicarse con nuestro equipo de admisión</li>
+        </ul>
+      </div>
+
+      <div style="text-align: center;">
+        <a href="https://admision.mtn.cl" style="display: inline-block; padding: 14px 28px; background-color: #003366; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold;">Ver en Portal de Admisión</a>
+      </div>
+
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6;">
+        <p>Quedamos atentos a cualquier consulta que pueda tener.</p>
+        <p>Atentamente,<br>
+        <strong>Equipo de Admisión</strong><br>
+        Colegio Monte Tabor y Nazaret</p>
+      </div>
+    </div>
+
+    <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #dee2e6;">
+      <p style="margin: 5px 0; font-size: 12px; color: #6c757d;"><strong>Colegio Monte Tabor y Nazaret</strong></p>
+      <p style="margin: 5px 0; font-size: 12px; color: #6c757d;">&copy; ${currentYear} Todos los derechos reservados</p>
+      <p style="margin: 5px 0; font-size: 12px; color: #6c757d;">Este es un correo automático, por favor no responder directamente a este mensaje.</p>
+    </div>
+  </div>
+</div>
+    `.trim();
+
+    // Send email
+    try {
+      const result = await emailService.sendEmail(guardianEmail, subject, message);
+
+      logger.info(`✅ Interview summary email sent for application ${applicationId}`, {
+        messageId: result.messageId,
+        recipient: guardianEmail,
+        interviewCount: interviews.length
+      });
+
+      res.json(ok({
+        message: 'Interview summary email sent successfully',
+        applicationId,
+        emailSent: true,
+        recipient: guardianEmail,
+        messageId: result.messageId,
+        interviewCount: interviews.length
+      }));
+    } catch (emailError) {
+      logger.error('❌ Error sending interview summary email:', emailError);
+
+      // Return success but indicate email failed
+      res.json(ok({
+        message: 'Interview summary processed but email failed to send',
+        applicationId,
+        emailSent: false,
+        error: emailError.message
+      }));
+    }
+  } catch (error) {
+    logger.error('Error in interview-summary endpoint:', error);
+    res.status(500).json(fail('INST_EMAIL_008', 'Error processing interview summary notification', error.message));
+  }
+});
+
 module.exports = router;
