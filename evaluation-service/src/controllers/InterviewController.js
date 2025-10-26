@@ -249,11 +249,31 @@ class InterviewController {
   }
 
   async getInterviewsByApplicationId(req, res) {
+    const { dbPool } = require('../config/database');
+
     try {
       const { applicationId } = req.params;
-      const interviews = await InterviewService.getInterviewsByApplicationId(applicationId);
 
-      return res.json(ok(interviews.map(i => i.toJSON())));
+      // Get interviews with interviewer names
+      const result = await dbPool.query(`
+        SELECT
+          i.*,
+          CONCAT(u1.first_name, ' ', u1.last_name) as interviewer_name,
+          CONCAT(u2.first_name, ' ', u2.last_name) as second_interviewer_name
+        FROM interviews i
+        LEFT JOIN users u1 ON i.interviewer_user_id = u1.id
+        LEFT JOIN users u2 ON i.second_interviewer_id = u2.id
+        WHERE i.application_id = $1
+        ORDER BY i.scheduled_date ASC, i.scheduled_time ASC
+      `, [applicationId]);
+
+      const interviews = result.rows.map(row => ({
+        ...Interview.fromDatabaseRow(row).toJSON(),
+        interviewerName: row.interviewer_name || 'No asignado',
+        secondInterviewerName: row.second_interviewer_name || null
+      }));
+
+      return res.json(ok(interviews));
     } catch (error) {
       logger.error(`Error getting interviews for application ${req.params.applicationId}:`, error);
       return res.status(500).json(fail('INT_009', 'Failed to retrieve interviews', error.message));
