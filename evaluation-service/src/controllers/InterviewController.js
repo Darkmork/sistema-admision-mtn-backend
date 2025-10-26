@@ -378,12 +378,25 @@ class InterviewController {
             interviewerIds.add(interview.secondInterviewerId);
           }
 
+          // Get main interviewer name
           const interviewerResult = await dbPool.query(`
             SELECT
               CONCAT(first_name, ' ', last_name) as interviewer_name
             FROM users
             WHERE id = $1
           `, [interview.interviewerId]);
+
+          // Get second interviewer name if exists
+          let secondInterviewerName = null;
+          if (interview.secondInterviewerId) {
+            const secondInterviewerResult = await dbPool.query(`
+              SELECT
+                CONCAT(first_name, ' ', last_name) as interviewer_name
+              FROM users
+              WHERE id = $1
+            `, [interview.secondInterviewerId]);
+            secondInterviewerName = secondInterviewerResult.rows[0]?.interviewer_name;
+          }
 
           return {
             type: interview.interviewType,
@@ -393,7 +406,8 @@ class InterviewController {
             location: interview.location,
             mode: interview.mode,
             status: interview.status,
-            interviewerName: interviewerResult.rows[0]?.interviewer_name || 'No asignado'
+            interviewerName: interviewerResult.rows[0]?.interviewer_name || 'No asignado',
+            secondInterviewerName
           };
         })
       );
