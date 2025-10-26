@@ -596,4 +596,112 @@ router.post('/bulk/assign', authenticate, validateCsrf, requireRole('ADMIN', 'CO
   }
 });
 
+// POST /api/evaluations/migrate/interviews - Generate evaluations for interviews without them
+router.post('/migrate/interviews', authenticate, validateCsrf, requireRole('ADMIN'), async (req, res) => {
+  try {
+    console.log('📦 [Migration] Starting evaluation migration for interviews...');
+
+    // Map interview types to evaluation types
+    const typeMapping = {
+      'FAMILY': 'FAMILY_INTERVIEW',
+      'CYCLE_DIRECTOR': 'CYCLE_DIRECTOR_INTERVIEW',
+      'INDIVIDUAL': 'PSYCHOLOGICAL_INTERVIEW'
+    };
+
+    // Find interviews without matching evaluations
+    const missingEvaluationsQuery = `
+      SELECT i.id as interview_id, i.application_id, i.type as interview_type,
+             i.interviewer_user_id, i.scheduled_date
+      FROM interviews i
+      WHERE NOT EXISTS (
+        SELECT 1 FROM evaluations e
+        WHERE e.application_id = i.application_id
+        AND (
+          (i.type = 'FAMILY' AND e.evaluation_type = 'FAMILY_INTERVIEW') OR
+          (i.type = 'CYCLE_DIRECTOR' AND e.evaluation_type = 'CYCLE_DIRECTOR_INTERVIEW') OR
+          (i.type = 'INDIVIDUAL' AND e.evaluation_type = 'PSYCHOLOGICAL_INTERVIEW')
+        )
+      )
+      ORDER BY i.id ASC
+    `;
+
+    const missingResult = await dbPool.query(missingEvaluationsQuery);
+    const interviewsWithoutEvaluations = missingResult.rows;
+
+    console.log(`📊 Found ${interviewsWithoutEvaluations.length} interviews without evaluations`);
+
+    if (interviewsWithoutEvaluations.length === 0) {
+      return res.json({
+        success: true,
+        message: 'All interviews already have evaluations',
+        created: 0,
+        interviews: []
+      });
+    }
+
+    // Create evaluations for each interview
+    const createdEvaluations = [];
+    const errors = [];
+
+    for (const interview of interviewsWithoutEvaluations) {
+      const evaluationType = typeMapping[interview.interview_type] || 'PSYCHOLOGICAL_INTERVIEW';
+
+      try {
+        console.log(`📝 Creating ${evaluationType} for interview ${interview.interview_id}, application ${interview.application_id}`);
+
+        const insertResult = await dbPool.query(
+          `INSERT INTO evaluations (
+            application_id, evaluator_id, evaluation_type, score, max_score,
+            strengths, areas_for_improvement, observations, recommendations, status, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+          RETURNING *`,
+          [
+            interview.application_id,
+            interview.interviewer_user_id,
+            evaluationType,
+            0,
+            100,
+            '',
+            '',
+            `Evaluación generada automáticamente para entrevista #${interview.interview_id}`,
+            '',
+            'PENDING'
+          ]
+        );
+
+        createdEvaluations.push({
+          interviewId: interview.interview_id,
+          evaluationId: insertResult.rows[0].id,
+          type: evaluationType,
+          applicationId: interview.application_id
+        });
+
+        console.log(`✅ Created evaluation ${insertResult.rows[0].id} for interview ${interview.interview_id}`);
+      } catch (error) {
+        console.error(`❌ Failed to create evaluation for interview ${interview.interview_id}:`, error.message);
+        errors.push({
+          interviewId: interview.interview_id,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Migration completed: ${createdEvaluations.length} evaluations created`,
+      created: createdEvaluations.length,
+      errors: errors.length,
+      evaluations: createdEvaluations,
+      failedInterviews: errors
+    });
+  } catch (error) {
+    console.error('❌ Migration error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error during migration',
+      details: error.message
+    });
+  }
+});
+
 module.exports = router;
