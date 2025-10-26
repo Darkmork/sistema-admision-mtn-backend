@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resumen de Entrevistas</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    .container {
+      background-color: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #003366 0%, #004d99 100%);
+      color: white;
+      padding: 30px 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 26px;
+    }
+    .header p {
+      margin: 10px 0 0 0;
+      opacity: 0.9;
+      font-size: 14px;
+    }
+    .content {
+      padding: 30px;
+    }
+    .greeting {
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+    .intro-text {
+      background-color: #e8f4f8;
+      border-left: 4px solid #17a2b8;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .interview-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .interview-card h3 {
+      margin: 0 0 15px 0;
+      font-size: 18px;
+      border-bottom: 2px solid rgba(255,255,255,0.3);
+      padding-bottom: 10px;
+    }
+    .interview-details {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 15px;
+    }
+    .detail-item {
+      background-color: rgba(255,255,255,0.1);
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .detail-item.full-width {
+      grid-column: 1 / -1;
+    }
+    .detail-label {
+      font-size: 11px;
+      opacity: 0.8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .detail-value {
+      font-size: 15px;
+      font-weight: bold;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .status-scheduled {
+      background-color: #28a745;
+    }
+    .status-confirmed {
+      background-color: #17a2b8;
+    }
+    .status-completed {
+      background-color: #6c757d;
+    }
+    .status-cancelled {
+      background-color: #dc3545;
+    }
+    .status-rescheduled {
+      background-color: #ffc107;
+      color: #333;
+    }
+    .summary-box {
+      background-color: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 20px;
+      border-radius: 5px;
+      margin: 25px 0;
+    }
+    .summary-box h3 {
+      margin-top: 0;
+      color: #856404;
+    }
+    .summary-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .stat-item {
+      background-color: white;
+      padding: 15px;
+      border-radius: 5px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .stat-number {
+      font-size: 28px;
+      font-weight: bold;
+      color: #003366;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      margin-top: 5px;
+    }
+    .button {
+      display: inline-block;
+      padding: 14px 28px;
+      background-color: #003366;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      margin: 20px 0;
+      font-weight: bold;
+      text-align: center;
+      transition: background-color 0.3s;
+    }
+    .button:hover {
+      background-color: #002244;
+    }
+    .footer {
+      background-color: #f8f9fa;
+      padding: 20px;
+      text-align: center;
+      border-top: 1px solid #dee2e6;
+    }
+    .footer p {
+      margin: 5px 0;
+      font-size: 12px;
+      color: #6c757d;
+    }
+    .signature {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #dee2e6;
+    }
+    @media only screen and (max-width: 600px) {
+      .interview-details {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📋 Resumen de Entrevistas</h1>
+      <p>{{studentName}} - Proceso de Admisión {{year}}</p>
+    </div>
+
+    <div class="content">
+      <p class="greeting">Estimado/a {{guardianName}},</p>
+
+      <div class="intro-text">
+        <p><strong>Se han programado las siguientes entrevistas</strong> para <strong>{{studentName}}</strong> como parte del proceso de admisión al Colegio Monte Tabor y Nazaret.</p>
+      </div>
+
+      <div class="summary-box">
+        <h3>📊 Resumen General</h3>
+        <div class="summary-stats">
+          <div class="stat-item">
+            <div class="stat-number">{{interviews.length}}</div>
+            <div class="stat-label">Entrevistas Totales</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">#{{applicationId}}</div>
+            <div class="stat-label">ID Aplicación</div>
+          </div>
+        </div>
+      </div>
+
+      <h2 style="color: #003366; margin-top: 30px;">📅 Entrevistas Programadas</h2>
+
+      {{#each interviews}}
+      <div class="interview-card">
+        <h3>
+          {{#if (eq type "FAMILY")}}
+            👨‍👩‍👧 Entrevista Familiar
+          {{else if (eq type "STUDENT")}}
+            👨‍🎓 Entrevista al Estudiante
+          {{else if (eq type "DIRECTOR")}}
+            👔 Entrevista con Director
+          {{else if (eq type "PSYCHOLOGIST")}}
+            🧠 Entrevista Psicológica
+          {{else if (eq type "ACADEMIC")}}
+            📚 Entrevista Académica
+          {{else if (eq type "CYCLE_DIRECTOR")}}
+            🎯 Entrevista Director de Ciclo
+          {{else}}
+            📋 {{type}}
+          {{/if}}
+        </h3>
+
+        <div class="interview-details">
+          <div class="detail-item">
+            <div class="detail-label">📅 Fecha</div>
+            <div class="detail-value">{{scheduledDate}}</div>
+          </div>
+
+          <div class="detail-item">
+            <div class="detail-label">🕐 Hora</div>
+            <div class="detail-value">{{scheduledTime}}</div>
+          </div>
+
+          <div class="detail-item">
+            <div class="detail-label">⏱️ Duración</div>
+            <div class="detail-value">{{duration}} min</div>
+          </div>
+
+          <div class="detail-item">
+            <div class="detail-label">
+              {{#if (eq mode "VIRTUAL")}}💻{{else}}📍{{/if}} Modalidad
+            </div>
+            <div class="detail-value">
+              {{#if (eq mode "VIRTUAL")}}Virtual{{else}}Presencial{{/if}}
+            </div>
+          </div>
+
+          <div class="detail-item full-width">
+            <div class="detail-label">👨‍🏫 Entrevistador</div>
+            <div class="detail-value">{{interviewerName}}</div>
+          </div>
+
+          {{#if location}}
+          <div class="detail-item full-width">
+            <div class="detail-label">📍 Lugar</div>
+            <div class="detail-value">{{location}}</div>
+          </div>
+          {{/if}}
+
+          <div class="detail-item full-width">
+            <div class="detail-label">📌 Estado</div>
+            <div class="detail-value">
+              <span class="status-badge status-{{status}}">{{status}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {{/each}}
+
+      <div style="background-color: #e8f4f8; border-left: 4px solid #17a2b8; padding: 20px; margin: 25px 0; border-radius: 4px;">
+        <h3 style="margin-top: 0; color: #0c5460;">ℹ️ Información Importante</h3>
+        <ul style="margin: 10px 0; padding-left: 20px; color: #0c5460;">
+          <li>Por favor llegue <strong>10 minutos antes</strong> de cada entrevista</li>
+          <li>Traiga los <strong>documentos solicitados</strong> (cédula de identidad, certificados académicos, etc.)</li>
+          <li>Para entrevistas virtuales, recibirá el link de conexión por separado</li>
+          <li>Si necesita <strong>reprogramar</strong> alguna entrevista, contáctenos con al menos <strong>48 horas de anticipación</strong></li>
+          <li>Cualquier consulta, puede comunicarse con nuestro equipo de admisión</li>
+        </ul>
+      </div>
+
+      <div style="text-align: center;">
+        <a href="https://admision.mtn.cl" class="button">Ver en Portal de Admisión</a>
+      </div>
+
+      <div class="signature">
+        <p>Quedamos atentos a cualquier consulta que pueda tener.</p>
+        <p>Atentamente,<br>
+        <strong>Equipo de Admisión</strong><br>
+        Colegio Monte Tabor y Nazaret</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p><strong>Colegio Monte Tabor y Nazaret</strong></p>
+      <p>&copy; {{year}} Todos los derechos reservados</p>
+      <p>Este es un correo automático, por favor no responder directamente a este mensaje.</p>
+    </div>
+  </div>
+</body>
+</html>
