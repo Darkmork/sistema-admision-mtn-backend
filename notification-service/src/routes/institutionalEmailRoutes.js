@@ -1068,8 +1068,10 @@ router.post('/interview-summary/:applicationId', async (req, res) => {
           </div>
 
           <div style="background-color: rgba(255,255,255,0.1); padding: 10px; border-radius: 4px; grid-column: 1 / -1;">
-            <div style="font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">👨‍🏫 Entrevistador</div>
-            <div style="font-size: 15px; font-weight: bold;">${interview.interviewerName}</div>
+            <div style="font-size: 11px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">👨‍🏫 Entrevistador${interview.secondInterviewerName ? 'es' : ''}</div>
+            <div style="font-size: 15px; font-weight: bold;">
+              ${interview.interviewerName}${interview.secondInterviewerName ? ` y ${interview.secondInterviewerName}` : ''}
+            </div>
           </div>
 
           ${interview.location ? `
