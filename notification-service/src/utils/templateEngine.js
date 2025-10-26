@@ -3,6 +3,11 @@ const fs = require('fs').promises;
 const path = require('path');
 const logger = require('./logger');
 
+// Register custom Handlebars helpers
+handlebars.registerHelper('eq', function(a, b) {
+  return a === b;
+});
+
 const templateCache = new Map();
 
 const loadTemplate = async (templateName) => {
