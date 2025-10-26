@@ -1,4 +1,5 @@
 const InterviewService = require('../services/InterviewService');
+const Interview = require('../models/Interview');
 const { ok, page, fail } = require('../utils/responseHelpers');
 const logger = require('../utils/logger');
 
