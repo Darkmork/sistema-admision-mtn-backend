@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrevista Programada</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    .container {
+      background-color: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .header {
+      background-color: #003366;
+      color: white;
+      padding: 30px 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .header p {
+      margin: 10px 0 0 0;
+      opacity: 0.9;
+    }
+    .content {
+      padding: 30px;
+    }
+    .greeting {
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+    .interview-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 8px;
+      padding: 25px;
+      margin: 25px 0;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .interview-card h2 {
+      margin: 0 0 20px 0;
+      font-size: 20px;
+      border-bottom: 2px solid rgba(255,255,255,0.3);
+      padding-bottom: 10px;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .info-item {
+      background-color: rgba(255,255,255,0.1);
+      padding: 12px;
+      border-radius: 6px;
+    }
+    .info-item.full-width {
+      grid-column: 1 / -1;
+    }
+    .info-label {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .info-value {
+      font-size: 16px;
+      font-weight: bold;
+    }
+    .icon {
+      margin-right: 8px;
+    }
+    .important-box {
+      background-color: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .important-box h3 {
+      margin-top: 0;
+      color: #856404;
+    }
+    .important-box ul {
+      margin: 10px 0;
+      padding-left: 20px;
+      color: #856404;
+    }
+    .important-box li {
+      margin: 8px 0;
+    }
+    .button {
+      display: inline-block;
+      padding: 14px 28px;
+      background-color: #003366;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      margin: 20px 0;
+      font-weight: bold;
+      text-align: center;
+      transition: background-color 0.3s;
+    }
+    .button:hover {
+      background-color: #002244;
+    }
+    .notes-box {
+      background-color: #e8f4f8;
+      border-left: 4px solid #17a2b8;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .notes-box strong {
+      color: #0c5460;
+    }
+    .footer {
+      background-color: #f8f9fa;
+      padding: 20px;
+      text-align: center;
+      border-top: 1px solid #dee2e6;
+    }
+    .footer p {
+      margin: 5px 0;
+      font-size: 12px;
+      color: #6c757d;
+    }
+    .signature {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #dee2e6;
+    }
+    @media only screen and (max-width: 600px) {
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>✅ Entrevista Programada</h1>
+      <p>Su entrevista ha sido agendada exitosamente</p>
+    </div>
+
+    <div class="content">
+      <p class="greeting">{{#if isGuardian}}Estimado/a {{recipientName}},{{else}}Estimado/a {{recipientName}},{{/if}}</p>
+
+      <p>{{#if isGuardian}}
+        Le informamos que se ha programado una entrevista para <strong>{{studentName}}</strong> como parte del proceso de admisión al Colegio Monte Tabor y Nazaret.
+      {{else}}
+        Se le ha asignado una entrevista como parte del proceso de evaluación de admisiones.
+      {{/if}}</p>
+
+      <div class="interview-card">
+        <h2><span class="icon">📋</span>{{interviewTypeLabel}}</h2>
+
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label"><span class="icon">📅</span>Fecha</div>
+            <div class="info-value">{{interviewDate}}</div>
+          </div>
+
+          <div class="info-item">
+            <div class="info-label"><span class="icon">🕐</span>Hora</div>
+            <div class="info-value">{{interviewTime}}</div>
+          </div>
+
+          <div class="info-item">
+            <div class="info-label"><span class="icon">⏱️</span>Duración</div>
+            <div class="info-value">{{duration}} minutos</div>
+          </div>
+
+          <div class="info-item">
+            <div class="info-label"><span class="icon">{{#if isVirtual}}💻{{else}}📍{{/if}}</span>Modalidad</div>
+            <div class="info-value">{{#if isVirtual}}Virtual{{else}}Presencial{{/if}}</div>
+          </div>
+
+          {{#unless isGuardian}}
+          <div class="info-item full-width">
+            <div class="info-label"><span class="icon">👨‍🎓</span>Estudiante</div>
+            <div class="info-value">{{studentName}}</div>
+          </div>
+          {{/unless}}
+
+          {{#if isGuardian}}
+          <div class="info-item full-width">
+            <div class="info-label"><span class="icon">👨‍🏫</span>{{#if secondInterviewer}}Entrevistadores{{else}}Entrevistador{{/if}}</div>
+            <div class="info-value">
+              {{interviewer}}
+              {{#if secondInterviewer}}<br>{{secondInterviewer}}{{/if}}
+            </div>
+          </div>
+          {{/if}}
+
+          {{#if location}}
+          <div class="info-item full-width">
+            <div class="info-label"><span class="icon">📍</span>Lugar</div>
+            <div class="info-value">{{location}}</div>
+          </div>
+          {{/if}}
+        </div>
+      </div>
+
+      <div class="important-box">
+        <h3>⚠️ Información Importante</h3>
+        <ul>
+          {{#if isGuardian}}
+          <li>Por favor llegue <strong>10 minutos antes</strong> de la hora programada</li>
+          <li>Traiga los <strong>documentos solicitados</strong> (cédula de identidad, certificados, etc.)</li>
+          <li>La entrevista tendrá una duración aproximada de <strong>{{duration}} minutos</strong></li>
+          <li>Si necesita <strong>reprogramar</strong>, contáctenos con al menos 24 horas de anticipación</li>
+          {{else}}
+          <li>Revise la información del estudiante antes de la entrevista</li>
+          <li>Prepare las preguntas y evaluaciones correspondientes</li>
+          <li>{{#if secondInterviewer}}Esta entrevista será realizada junto con: <strong>{{secondInterviewer}}</strong>{{else}}Esta es una entrevista individual{{/if}}</li>
+          <li>Registre sus observaciones en el sistema después de la entrevista</li>
+          {{/if}}
+        </ul>
+      </div>
+
+      {{#if notes}}
+      <div class="notes-box">
+        <strong>📝 Notas adicionales:</strong>
+        <p style="margin: 10px 0 0 0;">{{notes}}</p>
+      </div>
+      {{/if}}
+
+      {{#if virtualLink}}
+      <p style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin: 20px 0;">
+        <strong>🔗 Link de reunión virtual:</strong><br>
+        <a href="{{virtualLink}}" style="color: #155724; word-break: break-all;">{{virtualLink}}</a>
+      </p>
+      {{/if}}
+
+      <div style="text-align: center;">
+        <a href="{{portalUrl}}" class="button">Ver en Portal de Admisión</a>
+      </div>
+
+      <div class="signature">
+        <p>Si tiene alguna consulta, no dude en contactarnos.</p>
+        <p>Atentamente,<br>
+        <strong>Equipo de Admisión</strong><br>
+        Colegio Monte Tabor y Nazaret</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p><strong>Colegio Monte Tabor y Nazaret</strong></p>
+      <p>&copy; {{year}} Todos los derechos reservados</p>
+      <p>Este es un correo automático, por favor no responder directamente a este mensaje.</p>
+    </div>
+  </div>
+</body>
+</html>
