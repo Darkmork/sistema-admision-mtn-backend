@@ -339,8 +339,18 @@ class InterviewController {
         data: {
           guardianName,
           studentName,
-          interviews: interviewsWithDetails,
-          applicationId
+          interviews: interviewsWithDetails.map(interview => ({
+            ...interview,
+            scheduledDate: interview.scheduledDate ? new Date(interview.scheduledDate).toLocaleDateString('es-CL', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            }) : 'Fecha no definida',
+            scheduledTime: interview.scheduledTime ? interview.scheduledTime.substring(0, 5) : 'Hora no definida'
+          })),
+          applicationId,
+          year: new Date().getFullYear()
         }
       };
 
