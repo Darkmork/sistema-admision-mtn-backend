@@ -111,7 +111,7 @@ class EvaluationService {
 
       // Add student info to response
       const enrichedEvaluation = {
-        ...evaluation,
+        ...evaluation.toJSON(), // Use toJSON() to get plain object
         application: {
           id: row.application_id,
           status: row.application_status,
