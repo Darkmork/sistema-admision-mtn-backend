@@ -286,8 +286,7 @@ class InterviewController {
           s.paternal_last_name,
           s.maternal_last_name,
           g.email as guardian_email,
-          g.first_name as guardian_first_name,
-          g.last_name as guardian_last_name
+          g.full_name as guardian_full_name
         FROM applications a
         JOIN students s ON a.student_id = s.id
         LEFT JOIN guardians g ON a.guardian_id = g.id
@@ -300,7 +299,7 @@ class InterviewController {
 
       const appData = appResult.rows[0];
       const studentName = `${appData.first_name} ${appData.paternal_last_name} ${appData.maternal_last_name || ''}`.trim();
-      const guardianName = `${appData.guardian_first_name} ${appData.guardian_last_name}`.trim();
+      const guardianName = appData.guardian_full_name || 'Apoderado';
       const guardianEmail = appData.guardian_email;
 
       if (!guardianEmail) {
