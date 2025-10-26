@@ -260,6 +260,64 @@ class InterviewController {
     }
   }
 
+  // Check if interview summary was already sent
+  async checkSummaryStatus(req, res) {
+    const { dbPool } = require('../config/database');
+
+    try {
+      const { applicationId } = req.params;
+
+      // Get last updated timestamp of interviews for this application
+      const interviewsUpdate = await dbPool.query(`
+        SELECT MAX(updated_at) as last_updated
+        FROM interviews
+        WHERE application_id = $1
+      `, [applicationId]);
+
+      const lastInterviewUpdate = interviewsUpdate.rows[0]?.last_updated;
+
+      // Check if summary email was sent
+      const emailCheck = await dbPool.query(`
+        SELECT id, sent_at, additional_data
+        FROM email_notifications
+        WHERE application_id = $1
+          AND email_type = 'INTERVIEW_SUMMARY'
+        ORDER BY sent_at DESC
+        LIMIT 1
+      `, [applicationId]);
+
+      if (emailCheck.rows.length === 0) {
+        return res.json(ok({
+          summarySent: false,
+          canResend: true,
+          message: 'No se ha enviado resumen de entrevistas aún'
+        }));
+      }
+
+      const lastEmail = emailCheck.rows[0];
+      const emailSentAt = new Date(lastEmail.sent_at);
+      const interviewUpdatedAt = lastInterviewUpdate ? new Date(lastInterviewUpdate) : null;
+
+      // Check if interviews were modified after email was sent
+      const interviewsModified = interviewUpdatedAt && interviewUpdatedAt > emailSentAt;
+
+      return res.json(ok({
+        summarySent: true,
+        sentAt: emailSentAt,
+        canResend: interviewsModified,
+        interviewsModifiedAfterSend: interviewsModified,
+        recipientsCount: lastEmail.additional_data?.recipientsCount || 0,
+        message: interviewsModified
+          ? 'Las entrevistas fueron modificadas después del último envío. Puede reenviar el resumen.'
+          : 'Resumen ya enviado. Las entrevistas no han sido modificadas.'
+      }));
+
+    } catch (error) {
+      logger.error(`Error checking summary status for application ${req.params.applicationId}:`, error);
+      return res.status(500).json(fail('INT_017', 'Failed to check summary status', error.message));
+    }
+  }
+
   // Send interview summary email to applicant and interviewers
   async sendInterviewSummary(req, res) {
     const axios = require('axios');
@@ -413,6 +471,47 @@ class InterviewController {
       }
 
       logger.info(`Interview summary emails sent: ${emailsSent.length} successful, ${emailsFailed.length} failed`);
+
+      // Register email notification in database
+      if (emailsSent.length > 0) {
+        try {
+          const crypto = require('crypto');
+          const trackingToken = crypto.randomBytes(32).toString('hex');
+
+          await dbPool.query(`
+            INSERT INTO email_notifications (
+              application_id,
+              recipient_email,
+              email_type,
+              subject,
+              student_name,
+              student_gender,
+              target_school,
+              tracking_token,
+              additional_data
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `, [
+            applicationId,
+            applicantEmail, // Primary recipient
+            'INTERVIEW_SUMMARY',
+            `Resumen de Entrevistas - ${studentName}`,
+            studentName,
+            'MALE', // Default, could be retrieved from student table if needed
+            'MTN', // Monte Tabor y Nazaret
+            trackingToken,
+            JSON.stringify({
+              recipientsCount: emailsSent.length,
+              recipients: emailsSent,
+              interviewCount: interviews.length
+            })
+          ]);
+
+          logger.info(`Email notification registered for application ${applicationId}`);
+        } catch (dbError) {
+          logger.error('Failed to register email notification in database:', dbError);
+          // Don't fail the request, just log the error
+        }
+      }
 
       return res.json(ok({
         message: `Interview summary emails sent to ${emailsSent.length} recipients`,

@@ -254,6 +254,9 @@ router.get('/interviewer/:interviewerId', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/interviews/application/:applicationId/summary-status - Check if summary was already sent
+router.get('/application/:applicationId/summary-status', authenticate, InterviewController.checkSummaryStatus.bind(InterviewController));
+
 // POST /api/interviews/application/:applicationId/send-summary - Send interview summary via email
 router.post('/application/:applicationId/send-summary', authenticate, validateCsrf, InterviewController.sendInterviewSummary.bind(InterviewController));
 
