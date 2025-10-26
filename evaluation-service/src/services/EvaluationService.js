@@ -88,11 +88,19 @@ class EvaluationService {
           s.current_school as student_current_school,
           u.first_name as evaluator_first_name,
           u.last_name as evaluator_last_name,
-          u.subject as evaluator_subject
+          u.subject as evaluator_subject,
+          g.id as guardian_id,
+          g.rut as guardian_rut,
+          g.first_name as guardian_first_name,
+          g.last_name as guardian_last_name,
+          g.email as guardian_email,
+          g.phone as guardian_phone,
+          g.relationship as guardian_relationship
         FROM evaluations e
         LEFT JOIN applications a ON e.application_id = a.id
         LEFT JOIN students s ON a.student_id = s.id
         LEFT JOIN users u ON e.evaluator_id = u.id
+        LEFT JOIN guardians g ON a.guardian_id = g.id
         WHERE e.id = $1
       `;
       const result = await dbPool.query(query, [id]);
@@ -101,7 +109,7 @@ class EvaluationService {
       const row = result.rows[0];
       const evaluation = Evaluation.fromDatabaseRow(row);
 
-      // Add student info to response
+      // Add student info and guardian info to response
       const enrichedEvaluation = {
         ...evaluation,
         application: {
@@ -117,16 +125,30 @@ class EvaluationService {
             gradeApplied: row.student_grade_applied,
             birthDate: row.student_birth_date,
             currentSchool: row.student_current_school
-          }
+          },
+          guardian: row.guardian_id ? {
+            id: row.guardian_id,
+            rut: row.guardian_rut,
+            firstName: row.guardian_first_name,
+            lastName: row.guardian_last_name,
+            email: row.guardian_email,
+            phone: row.guardian_phone,
+            relationship: row.guardian_relationship
+          } : null
         },
         evaluator: {
           firstName: row.evaluator_first_name,
           lastName: row.evaluator_last_name,
           subject: row.evaluator_subject
-        }
+        },
+        // Flatten guardian info for easy access
+        guardianName: row.guardian_id ? `${row.guardian_first_name} ${row.guardian_last_name}` : null,
+        guardianEmail: row.guardian_email || null,
+        guardianPhone: row.guardian_phone || null,
+        guardianRelationship: row.guardian_relationship || null
       };
 
-      logger.info(`Retrieved evaluation ${id} with student info`);
+      logger.info(`Retrieved evaluation ${id} with student and guardian info`);
       return enrichedEvaluation;
     });
   }
