@@ -246,7 +246,7 @@ router.get('/available-slots', authenticate, async (req, res) => {
 
     // Get existing interviews for this interviewer on this date
     const interviewsResult = await dbPool.query(`
-      SELECT scheduled_time, duration
+      SELECT scheduled_time::text as scheduled_time, duration
       FROM interviews
       WHERE (interviewer_id = $1 OR second_interviewer_id = $1)
         AND scheduled_date = $2
