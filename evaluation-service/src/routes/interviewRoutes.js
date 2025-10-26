@@ -137,12 +137,18 @@ router.get('/calendar', authenticate, async (req, res) => {
 
     let query = `
       SELECT i.*,
+             i.scheduled_time::text as scheduled_time_text,
              s.first_name,
              s.paternal_last_name,
-             s.maternal_last_name
+             s.maternal_last_name,
+             s.grade_applied,
+             CONCAT(u1.first_name, ' ', u1.last_name) as interviewer_name,
+             CONCAT(u2.first_name, ' ', u2.last_name) as second_interviewer_name
       FROM interviews i
       LEFT JOIN applications a ON i.application_id = a.id
       LEFT JOIN students s ON a.student_id = s.id
+      LEFT JOIN users u1 ON i.interviewer_user_id = u1.id
+      LEFT JOIN users u2 ON i.second_interviewer_id = u2.id
       WHERE 1=1
     `;
     const params = [];
@@ -158,21 +164,30 @@ router.get('/calendar', authenticate, async (req, res) => {
       params.push(endDate);
     }
 
-    query += ' ORDER BY i.scheduled_date ASC';
+    query += ' ORDER BY i.scheduled_date ASC, i.scheduled_time ASC';
 
     const result = await dbPool.query(query, params);
 
     const events = result.rows.map(row => ({
       id: row.id,
-      title: `${row.type || 'Entrevista'} - ${row.first_name} ${row.paternal_last_name}`,
+      title: `${row.interview_type || 'Entrevista'} - ${row.first_name} ${row.paternal_last_name}`,
       start: row.scheduled_date,
       end: row.scheduled_date,
       status: row.status,
-      type: row.type,
+      interviewType: row.interview_type,
       studentName: `${row.first_name} ${row.paternal_last_name} ${row.maternal_last_name || ''}`.trim(),
+      gradeApplied: row.grade_applied,
+      scheduledDate: row.scheduled_date,
+      scheduledTime: row.scheduled_time_text || row.scheduled_time,
+      duration: row.duration,
       location: row.location,
+      mode: row.mode,
       notes: row.notes,
-      applicationId: row.application_id
+      applicationId: row.application_id,
+      interviewerId: row.interviewer_user_id,
+      secondInterviewerId: row.second_interviewer_id,
+      interviewerName: row.interviewer_name || 'No asignado',
+      secondInterviewerName: row.second_interviewer_name || null
     }));
 
     const response = {
