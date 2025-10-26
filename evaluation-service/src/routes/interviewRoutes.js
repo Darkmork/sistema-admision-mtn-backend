@@ -82,9 +82,9 @@ router.get('/statistics', authenticate, async (req, res) => {
       GROUP BY status
     `);
     const byTypeResult = await dbPool.query(`
-      SELECT type, COUNT(*) as count
+      SELECT interview_type as type, COUNT(*) as count
       FROM interviews
-      GROUP BY type
+      GROUP BY interview_type
     `);
 
     const upcomingResult = await dbPool.query(`
