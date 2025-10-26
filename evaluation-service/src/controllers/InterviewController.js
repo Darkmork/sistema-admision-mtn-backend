@@ -53,11 +53,8 @@ class InterviewController {
       // Query with JOINs to get student and interviewer info
       const query = `
         SELECT
-          i.id, i.application_id, i.interviewer_user_id, i.second_interviewer_id,
-          i.type, i.scheduled_date,
-          i.scheduled_time::text as scheduled_time,
-          i.duration, i.location, i.mode, i.status, i.notes, i.cancel_reason,
-          i.created_at, i.updated_at,
+          i.*,
+          i.scheduled_time::text as scheduled_time_text,
           s.first_name,
           s.paternal_last_name,
           s.maternal_last_name,
@@ -95,7 +92,7 @@ class InterviewController {
         secondInterviewerId: row.second_interviewer_id,
         interviewType: row.type,
         scheduledDate: row.scheduled_date,
-        scheduledTime: row.scheduled_time,
+        scheduledTime: row.scheduled_time_text || row.scheduled_time, // Usar versión texto si existe
         duration: row.duration,
         location: row.location,
         mode: row.mode,
