@@ -597,8 +597,7 @@ router.post('/bulk/assign', authenticate, validateCsrf, requireRole('ADMIN', 'CO
 });
 
 // POST /api/evaluations/migrate/interviews - Generate evaluations for interviews without them
-// TEMPORARY: No auth for one-time migration
-router.post('/migrate/interviews', async (req, res) => {
+router.post('/migrate/interviews', authenticate, validateCsrf, requireRole('ADMIN'), async (req, res) => {
   try {
     console.log('📦 [Migration] Starting evaluation migration for interviews...');
 
