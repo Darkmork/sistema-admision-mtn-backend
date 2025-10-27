@@ -245,24 +245,39 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
       total: parseInt(row.total),
       submitted: parseInt(row.submitted),
       approved: parseInt(row.approved),
-      rejected: parseInt(row.rejected)
+      rejected: parseInt(row.rejected),
+      underReview: 0  // Add this field for frontend compatibility
     }));
 
-    const statusBreakdown = {};
+    // Status breakdown with proper mapping
+    const statusBreakdown = {
+      submitted: 0,
+      underReview: 0,
+      approved: 0,
+      rejected: 0,
+      waitlist: 0
+    };
+
     statusStatsQuery.rows.forEach(row => {
-      statusBreakdown[row.status.toLowerCase()] = parseInt(row.count);
+      const status = row.status.toLowerCase();
+      statusBreakdown[status] = parseInt(row.count);
     });
 
     const academicYears = academicYearsQuery.rows.map(row => parseInt(row.application_year));
+    const totalApps = Object.values(statusBreakdown).reduce((sum, val) => sum + val, 0);
 
-    // Grade breakdown with status counts
-    const gradeDistribution = gradeBreakdownQuery.rows.map(row => ({
-      grade: row.grade || 'Sin especificar',
-      total: parseInt(row.count),
-      approved: parseInt(row.approved),
-      rejected: parseInt(row.rejected),
-      pending: parseInt(row.pending)
-    }));
+    // Grade breakdown with status counts AND percentage
+    const gradeDistribution = gradeBreakdownQuery.rows.map(row => {
+      const count = parseInt(row.count);
+      return {
+        grade: row.grade || 'Sin especificar',
+        count: count,
+        approved: parseInt(row.approved),
+        rejected: parseInt(row.rejected),
+        pending: parseInt(row.pending),
+        percentage: totalApps > 0 ? ((count / totalApps) * 100).toFixed(1) : 0
+      };
+    });
 
     // Interview metrics
     const interviewMetrics = {
@@ -286,7 +301,7 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
     // Build complete detailed stats object
     const detailedStats = {
       academicYear: yearFilter,
-      totalApplications: Object.values(statusBreakdown).reduce((sum, val) => sum + val, 0),
+      totalApplications: totalApps,
       statusBreakdown: statusBreakdown,
       gradeDistribution: gradeDistribution,
       monthlyTrends: monthlyTrends,
