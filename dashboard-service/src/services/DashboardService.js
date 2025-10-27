@@ -342,6 +342,237 @@ class DashboardService {
   async getCacheStats() {
     return cache.getStats();
   }
+
+  /**
+   * Get applicant metrics with exam completion and family interview scores
+   * @param {Object} filters - Filter options
+   * @param {string} filters.studentName - Filter by student name (partial match)
+   * @param {number} filters.minFamilyScore - Minimum family interview score
+   * @param {number} filters.maxFamilyScore - Maximum family interview score
+   * @param {number} filters.minExamCompletion - Minimum exam completion percentage (0-100)
+   * @param {string} filters.applicationStatus - Filter by application status
+   * @param {string} filters.gradeApplied - Filter by grade applied
+   * @param {number} filters.academicYear - Filter by academic year
+   * @param {number} filters.limit - Maximum number of results (default: 100)
+   * @param {number} filters.offset - Pagination offset (default: 0)
+   */
+  async getApplicantMetrics(filters = {}) {
+    const {
+      studentName,
+      minFamilyScore,
+      maxFamilyScore,
+      minExamCompletion,
+      applicationStatus,
+      gradeApplied,
+      academicYear,
+      limit = 100,
+      offset = 0
+    } = filters;
+
+    return await heavyQueryBreaker.fire(async () => {
+      // Build WHERE clauses dynamically
+      const whereClauses = [];
+      const queryParams = [];
+      let paramCounter = 1;
+
+      // Academic year filter
+      if (academicYear) {
+        whereClauses.push(`EXTRACT(YEAR FROM a.created_at) = $${paramCounter}`);
+        queryParams.push(academicYear);
+        paramCounter++;
+      }
+
+      // Student name filter (case-insensitive partial match)
+      if (studentName) {
+        whereClauses.push(`(s.first_name || ' ' || s.paternal_last_name || ' ' || COALESCE(s.maternal_last_name, '')) ILIKE $${paramCounter}`);
+        queryParams.push(`%${studentName}%`);
+        paramCounter++;
+      }
+
+      // Application status filter
+      if (applicationStatus) {
+        whereClauses.push(`a.status = $${paramCounter}`);
+        queryParams.push(applicationStatus);
+        paramCounter++;
+      }
+
+      // Grade applied filter
+      if (gradeApplied) {
+        whereClauses.push(`s.grade_applied = $${paramCounter}`);
+        queryParams.push(gradeApplied);
+        paramCounter++;
+      }
+
+      const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+      // Main query with exam completion and family score
+      const query = `
+        WITH applicant_data AS (
+          SELECT
+            s.id as student_id,
+            s.first_name || ' ' || s.paternal_last_name || ' ' || COALESCE(s.maternal_last_name, '') as student_name,
+            s.rut as student_rut,
+            s.grade_applied,
+            a.id as application_id,
+            a.status as application_status,
+            a.submission_date,
+
+            -- Exam completion metrics
+            COUNT(DISTINCT e.id) FILTER (
+              WHERE e.evaluation_type IN ('LANGUAGE_EXAM', 'MATHEMATICS_EXAM', 'ENGLISH_EXAM')
+            ) as total_exams_assigned,
+
+            COUNT(DISTINCT e.id) FILTER (
+              WHERE e.evaluation_type IN ('LANGUAGE_EXAM', 'MATHEMATICS_EXAM', 'ENGLISH_EXAM')
+              AND e.status = 'COMPLETED'
+            ) as exams_completed,
+
+            CASE
+              WHEN COUNT(DISTINCT e.id) FILTER (
+                WHERE e.evaluation_type IN ('LANGUAGE_EXAM', 'MATHEMATICS_EXAM', 'ENGLISH_EXAM')
+              ) > 0
+              THEN ROUND(
+                (COUNT(DISTINCT e.id) FILTER (
+                  WHERE e.evaluation_type IN ('LANGUAGE_EXAM', 'MATHEMATICS_EXAM', 'ENGLISH_EXAM')
+                  AND e.status = 'COMPLETED'
+                )::decimal /
+                COUNT(DISTINCT e.id) FILTER (
+                  WHERE e.evaluation_type IN ('LANGUAGE_EXAM', 'MATHEMATICS_EXAM', 'ENGLISH_EXAM')
+                )::decimal) * 100, 2
+              )
+              ELSE 0
+            END as exam_completion_percentage,
+
+            -- Family interview score
+            AVG(i.score) FILTER (
+              WHERE i.type = 'FAMILY' AND i.status = 'COMPLETED' AND i.score IS NOT NULL
+            ) as family_interview_score,
+
+            COUNT(DISTINCT i.id) FILTER (
+              WHERE i.type = 'FAMILY' AND i.status = 'COMPLETED'
+            ) as family_interviews_completed,
+
+            -- Guardian info
+            u.email as guardian_email,
+            u.first_name || ' ' || u.last_name as guardian_name,
+            u.phone as guardian_phone
+
+          FROM students s
+          JOIN applications a ON a.student_id = s.id
+          LEFT JOIN evaluations e ON e.application_id = a.id
+          LEFT JOIN interviews i ON i.application_id = a.id
+          LEFT JOIN users u ON u.id = a.applicant_user_id
+          ${whereClause}
+          GROUP BY
+            s.id, s.first_name, s.paternal_last_name, s.maternal_last_name,
+            s.rut, s.grade_applied, a.id, a.status, a.submission_date,
+            u.email, u.first_name, u.last_name, u.phone
+        )
+        SELECT * FROM applicant_data
+        WHERE 1=1
+        ${minFamilyScore !== undefined ? `AND family_interview_score >= ${minFamilyScore}` : ''}
+        ${maxFamilyScore !== undefined ? `AND family_interview_score <= ${maxFamilyScore}` : ''}
+        ${minExamCompletion !== undefined ? `AND exam_completion_percentage >= ${minExamCompletion}` : ''}
+        ORDER BY student_name ASC
+        LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+      `;
+
+      queryParams.push(limit, offset);
+
+      logger.info('Fetching applicant metrics', { filters, queryParams });
+
+      const result = await dbPool.query(query, queryParams);
+
+      // Get total count for pagination
+      const countQuery = `
+        WITH applicant_data AS (
+          SELECT
+            s.id,
+            CASE
+              WHEN COUNT(DISTINCT e.id) FILTER (
+                WHERE e.evaluation_type IN ('LANGUAGE_EXAM', 'MATHEMATICS_EXAM', 'ENGLISH_EXAM')
+              ) > 0
+              THEN ROUND(
+                (COUNT(DISTINCT e.id) FILTER (
+                  WHERE e.evaluation_type IN ('LANGUAGE_EXAM', 'MATHEMATICS_EXAM', 'ENGLISH_EXAM')
+                  AND e.status = 'COMPLETED'
+                )::decimal /
+                COUNT(DISTINCT e.id) FILTER (
+                  WHERE e.evaluation_type IN ('LANGUAGE_EXAM', 'MATHEMATICS_EXAM', 'ENGLISH_EXAM')
+                )::decimal) * 100, 2
+              )
+              ELSE 0
+            END as exam_completion_percentage,
+            AVG(i.score) FILTER (
+              WHERE i.type = 'FAMILY' AND i.status = 'COMPLETED' AND i.score IS NOT NULL
+            ) as family_interview_score
+          FROM students s
+          JOIN applications a ON a.student_id = s.id
+          LEFT JOIN evaluations e ON e.application_id = a.id
+          LEFT JOIN interviews i ON i.application_id = a.id
+          ${whereClause}
+          GROUP BY s.id
+        )
+        SELECT COUNT(*) FROM applicant_data
+        WHERE 1=1
+        ${minFamilyScore !== undefined ? `AND family_interview_score >= ${minFamilyScore}` : ''}
+        ${maxFamilyScore !== undefined ? `AND family_interview_score <= ${maxFamilyScore}` : ''}
+        ${minExamCompletion !== undefined ? `AND exam_completion_percentage >= ${minExamCompletion}` : ''}
+      `;
+
+      const countResult = await dbPool.query(countQuery, queryParams.slice(0, -2));
+      const totalCount = parseInt(countResult.rows[0].count);
+
+      // Format results
+      const applicants = result.rows.map(row => ({
+        studentId: row.student_id,
+        studentName: row.student_name.trim(),
+        studentRut: row.student_rut,
+        gradeApplied: row.grade_applied,
+        applicationId: row.application_id,
+        applicationStatus: row.application_status,
+        submissionDate: row.submission_date,
+        examMetrics: {
+          totalExamsAssigned: parseInt(row.total_exams_assigned),
+          examsCompleted: parseInt(row.exams_completed),
+          completionPercentage: parseFloat(row.exam_completion_percentage) || 0
+        },
+        familyInterviewMetrics: {
+          score: row.family_interview_score ? parseFloat(row.family_interview_score).toFixed(2) : null,
+          interviewsCompleted: parseInt(row.family_interviews_completed)
+        },
+        guardianInfo: {
+          name: row.guardian_name,
+          email: row.guardian_email,
+          phone: row.guardian_phone
+        }
+      }));
+
+      return {
+        applicants,
+        pagination: {
+          total: totalCount,
+          limit: limit,
+          offset: offset,
+          totalPages: Math.ceil(totalCount / limit),
+          currentPage: Math.floor(offset / limit) + 1
+        },
+        summary: {
+          totalApplicants: totalCount,
+          avgExamCompletion: applicants.length > 0
+            ? (applicants.reduce((sum, a) => sum + a.examMetrics.completionPercentage, 0) / applicants.length).toFixed(2)
+            : 0,
+          avgFamilyScore: applicants.length > 0
+            ? (applicants
+                .filter(a => a.familyInterviewMetrics.score !== null)
+                .reduce((sum, a) => sum + parseFloat(a.familyInterviewMetrics.score), 0) /
+               applicants.filter(a => a.familyInterviewMetrics.score !== null).length
+              ).toFixed(2)
+            : null
+        }
+      };
+    });
+  }
 }
 
 module.exports = new DashboardService();

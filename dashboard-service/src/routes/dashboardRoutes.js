@@ -383,87 +383,191 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
 
     // Map frontend column names to SQL expressions
     const sortMapping = {
-      'studentName': `s.first_name || ' ' || s.last_name`,
+      'studentName': `s.first_name || ' ' || s.paternal_last_name || ' ' || COALESCE(s.maternal_last_name, '')`,
       'gradeApplied': 's.grade_applied',
       'evaluationPassRate': 'evaluation_pass_rate',
       'interviewAvg': 'interview_avg_score',
       'applicationStatus': 'a.status'
     };
 
+    // Get base applicant data
     const applicantMetricsQuery = await heavyQueryBreaker.fire(async () =>
       await client.query(`
         SELECT
           a.id as application_id,
           s.id as student_id,
-          s.first_name || ' ' || s.last_name as student_name,
+          s.first_name || ' ' || s.paternal_last_name || ' ' || COALESCE(s.maternal_last_name, '') as student_name,
           s.grade_applied as grade_applied,
           a.status as application_status,
           a.created_at as application_date,
-
-          -- Guardian info
           COALESCE(g.full_name, 'No registrado') as guardian_name,
-          COALESCE(g.email, 'No registrado') as guardian_email,
-
-          -- Evaluation metrics
-          COUNT(DISTINCT e.id) FILTER (WHERE e.status = 'COMPLETED') as evaluations_completed,
-          COUNT(DISTINCT e.id) as evaluations_total,
-          CASE
-            WHEN COUNT(DISTINCT e.id) > 0
-            THEN (COUNT(DISTINCT e.id) FILTER (WHERE e.status = 'COMPLETED')::float / COUNT(DISTINCT e.id)::float * 100)
-            ELSE 0
-          END as evaluation_pass_rate,
-          AVG(e.score) FILTER (WHERE e.status = 'COMPLETED' AND e.score IS NOT NULL) as evaluation_avg_score,
-
-          -- Interview metrics
-          COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'COMPLETED' AND i.interview_type = 'FAMILY') as family_interviews_completed,
-          AVG(
-            CASE
-              WHEN i.status = 'COMPLETED' AND i.interview_type = 'FAMILY' AND i.notes IS NOT NULL
-              THEN LENGTH(i.notes)  -- Simple metric: length of notes as proxy for thoroughness
-              ELSE NULL
-            END
-          ) as interview_avg_score,
-
-          -- Document completion
-          COUNT(DISTINCT d.id) FILTER (WHERE d.status = 'APPROVED') as documents_approved,
-          COUNT(DISTINCT d.id) as documents_total,
-          CASE
-            WHEN COUNT(DISTINCT d.id) > 0
-            THEN (COUNT(DISTINCT d.id) FILTER (WHERE d.status = 'APPROVED')::float / COUNT(DISTINCT d.id)::float * 100)
-            ELSE 0
-          END as document_completion_rate
-
+          COALESCE(g.email, 'No registrado') as guardian_email
         FROM applications a
         INNER JOIN students s ON s.id = a.student_id
         LEFT JOIN guardians g ON g.id = a.guardian_id
-        LEFT JOIN evaluations e ON e.application_id = a.id
-        LEFT JOIN interviews i ON i.application_id = a.id
-        LEFT JOIN documents d ON d.application_id = a.id
         WHERE ${whereClause}
-        GROUP BY a.id, s.id, s.first_name, s.last_name, s.grade_applied, a.status, a.created_at, g.full_name, g.email
         ORDER BY ${sortMapping[sortColumn]} ${order}
       `, params)
     );
 
-    const applicants = applicantMetricsQuery.rows.map(row => ({
-      applicationId: row.application_id,
-      studentId: row.student_id,
-      studentName: row.student_name,
-      gradeApplied: row.grade_applied || 'No especificado',
-      applicationStatus: row.application_status,
-      applicationDate: row.application_date,
-      guardianName: row.guardian_name,
-      guardianEmail: row.guardian_email,
-      evaluationsCompleted: parseInt(row.evaluations_completed || 0),
-      evaluationsTotal: parseInt(row.evaluations_total || 0),
-      evaluationPassRate: parseFloat(row.evaluation_pass_rate || 0).toFixed(1),
-      evaluationAvgScore: row.evaluation_avg_score ? parseFloat(row.evaluation_avg_score).toFixed(1) : null,
-      familyInterviewsCompleted: parseInt(row.family_interviews_completed || 0),
-      interviewAvgScore: row.interview_avg_score ? parseFloat(row.interview_avg_score).toFixed(0) : null,
-      documentsApproved: parseInt(row.documents_approved || 0),
-      documentsTotal: parseInt(row.documents_total || 0),
-      documentCompletionRate: parseFloat(row.document_completion_rate || 0).toFixed(1)
-    }));
+    // Get detailed evaluations for each application (individual exam scores)
+    const evaluationsQuery = await mediumQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          e.application_id,
+          e.evaluation_type,
+          e.status,
+          e.score,
+          e.max_score
+        FROM evaluations e
+        WHERE e.application_id = ANY(
+          SELECT id FROM applications a
+          WHERE ${whereClause}
+        )
+      `, params)
+    );
+
+    // Get detailed family interviews (individual scores from each interviewer)
+    const interviewsQuery = await mediumQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          i.application_id,
+          i.interview_type,
+          i.status,
+          i.score,
+          i.result,
+          u.first_name || ' ' || u.last_name as interviewer_name
+        FROM interviews i
+        LEFT JOIN users u ON u.id = i.interviewer_user_id
+        WHERE i.interview_type = 'FAMILY'
+          AND i.application_id = ANY(
+            SELECT id FROM applications a
+            WHERE ${whereClause}
+          )
+      `, params)
+    );
+
+    // Get document completion data
+    const documentsQuery = await mediumQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          d.application_id,
+          COUNT(*) FILTER (WHERE d.approval_status = 'APPROVED') as documents_approved,
+          COUNT(*) as documents_total
+        FROM documents d
+        WHERE d.application_id = ANY(
+          SELECT id FROM applications a
+          WHERE ${whereClause}
+        )
+        GROUP BY d.application_id
+      `, params)
+    );
+
+    // Map evaluations by application_id
+    const evaluationsByApp = {};
+    evaluationsQuery.rows.forEach(eval => {
+      if (!evaluationsByApp[eval.application_id]) {
+        evaluationsByApp[eval.application_id] = [];
+      }
+      evaluationsByApp[eval.application_id].push({
+        type: eval.evaluation_type,
+        status: eval.status,
+        score: eval.score,
+        maxScore: eval.max_score
+      });
+    });
+
+    // Map interviews by application_id
+    const interviewsByApp = {};
+    interviewsQuery.rows.forEach(interview => {
+      if (!interviewsByApp[interview.application_id]) {
+        interviewsByApp[interview.application_id] = [];
+      }
+      interviewsByApp[interview.application_id].push({
+        status: interview.status,
+        score: interview.score,
+        result: interview.result,
+        interviewerName: interview.interviewer_name
+      });
+    });
+
+    // Map documents by application_id
+    const documentsByApp = {};
+    documentsQuery.rows.forEach(doc => {
+      documentsByApp[doc.application_id] = {
+        approved: parseInt(doc.documents_approved || 0),
+        total: parseInt(doc.documents_total || 0)
+      };
+    });
+
+    // Build final response with detailed exam and interview data
+    const applicants = applicantMetricsQuery.rows.map(row => {
+      const appId = row.application_id;
+      const evaluations = evaluationsByApp[appId] || [];
+      const interviews = interviewsByApp[appId] || [];
+      const docs = documentsByApp[appId] || { approved: 0, total: 0 };
+
+      // Extract individual exam scores
+      const mathExam = evaluations.find(e => e.type === 'MATHEMATICS_EXAM');
+      const languageExam = evaluations.find(e => e.type === 'LANGUAGE_EXAM');
+      const englishExam = evaluations.find(e => e.type === 'ENGLISH_EXAM');
+
+      // Calculate exam completion percentage
+      const totalExams = [mathExam, languageExam, englishExam].filter(e => e).length;
+      const completedExams = [mathExam, languageExam, englishExam].filter(e => e && e.status === 'COMPLETED').length;
+      const examCompletionRate = totalExams > 0 ? ((completedExams / totalExams) * 100).toFixed(1) : '0.0';
+
+      // Extract family interview scores
+      const completedInterviews = interviews.filter(i => i.status === 'COMPLETED' && i.score !== null);
+
+      return {
+        applicationId: appId,
+        studentId: row.student_id,
+        studentName: row.student_name,
+        gradeApplied: row.grade_applied || 'No especificado',
+        applicationStatus: row.application_status,
+        applicationDate: row.application_date,
+        guardianName: row.guardian_name,
+        guardianEmail: row.guardian_email,
+
+        // Detailed exam scores
+        examScores: {
+          mathematics: mathExam ? {
+            status: mathExam.status,
+            score: mathExam.score,
+            maxScore: mathExam.maxScore,
+            percentage: mathExam.score && mathExam.maxScore ? ((mathExam.score / mathExam.maxScore) * 100).toFixed(1) : null
+          } : null,
+          language: languageExam ? {
+            status: languageExam.status,
+            score: languageExam.score,
+            maxScore: languageExam.maxScore,
+            percentage: languageExam.score && languageExam.maxScore ? ((languageExam.score / languageExam.maxScore) * 100).toFixed(1) : null
+          } : null,
+          english: englishExam ? {
+            status: englishExam.status,
+            score: englishExam.score,
+            maxScore: englishExam.maxScore,
+            percentage: englishExam.score && englishExam.maxScore ? ((englishExam.score / englishExam.maxScore) * 100).toFixed(1) : null
+          } : null,
+          completionRate: examCompletionRate
+        },
+
+        // Detailed family interview scores (from each interviewer)
+        familyInterviews: completedInterviews.map(i => ({
+          interviewerName: i.interviewerName || 'Sin asignar',
+          score: i.score,
+          result: i.result
+        })),
+
+        // Document metrics
+        documents: {
+          approved: docs.approved,
+          total: docs.total,
+          completionRate: docs.total > 0 ? ((docs.approved / docs.total) * 100).toFixed(1) : '0.0'
+        }
+      };
+    });
 
     res.json({
       success: true,
