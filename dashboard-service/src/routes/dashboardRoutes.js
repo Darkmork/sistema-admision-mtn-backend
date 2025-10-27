@@ -346,6 +346,162 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
 });
 
 /**
+ * @route   GET /api/dashboard/applicant-metrics
+ * @desc    Get detailed metrics for each applicant with filters
+ * @access  Private (ADMIN, COORDINATOR)
+ * @query   academicYear, grade, status, sortBy, sortOrder
+ */
+router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+  const { academicYear, grade, status, sortBy = 'studentName', sortOrder = 'ASC' } = req.query;
+  const yearFilter = academicYear ? parseInt(academicYear) : new Date().getFullYear() + 1;
+
+  const client = await dbPool.connect();
+  try {
+    // Build WHERE clause dynamically
+    const conditions = ['EXTRACT(YEAR FROM a.created_at) = $1', 'a.deleted_at IS NULL'];
+    const params = [yearFilter];
+    let paramCount = 1;
+
+    if (grade) {
+      paramCount++;
+      conditions.push(`s.grade_applied = $${paramCount}`);
+      params.push(grade);
+    }
+
+    if (status) {
+      paramCount++;
+      conditions.push(`a.status = $${paramCount}`);
+      params.push(status.toUpperCase());
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    // Validate sortBy to prevent SQL injection
+    const validSortColumns = ['studentName', 'gradeApplied', 'evaluationPassRate', 'interviewAvg', 'applicationStatus'];
+    const sortColumn = validSortColumns.includes(sortBy) ? sortBy : 'studentName';
+    const order = sortOrder.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+    // Map frontend column names to SQL expressions
+    const sortMapping = {
+      'studentName': `s.first_name || ' ' || s.last_name`,
+      'gradeApplied': 's.grade_applied',
+      'evaluationPassRate': 'evaluation_pass_rate',
+      'interviewAvg': 'interview_avg_score',
+      'applicationStatus': 'a.status'
+    };
+
+    const applicantMetricsQuery = await heavyQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          a.id as application_id,
+          s.id as student_id,
+          s.first_name || ' ' || s.last_name as student_name,
+          s.grade_applied as grade_applied,
+          a.status as application_status,
+          a.created_at as application_date,
+
+          -- Guardian info
+          COALESCE(g.first_name || ' ' || g.last_name, 'No registrado') as guardian_name,
+          COALESCE(g.email, 'No registrado') as guardian_email,
+
+          -- Evaluation metrics
+          COUNT(DISTINCT e.id) FILTER (WHERE e.status = 'COMPLETED') as evaluations_completed,
+          COUNT(DISTINCT e.id) as evaluations_total,
+          CASE
+            WHEN COUNT(DISTINCT e.id) > 0
+            THEN (COUNT(DISTINCT e.id) FILTER (WHERE e.status = 'COMPLETED')::float / COUNT(DISTINCT e.id)::float * 100)
+            ELSE 0
+          END as evaluation_pass_rate,
+          AVG(e.score) FILTER (WHERE e.status = 'COMPLETED' AND e.score IS NOT NULL) as evaluation_avg_score,
+
+          -- Interview metrics
+          COUNT(DISTINCT i.id) FILTER (WHERE i.status = 'COMPLETED' AND i.interview_type = 'FAMILY') as family_interviews_completed,
+          AVG(
+            CASE
+              WHEN i.status = 'COMPLETED' AND i.interview_type = 'FAMILY' AND i.notes IS NOT NULL
+              THEN LENGTH(i.notes)  -- Simple metric: length of notes as proxy for thoroughness
+              ELSE NULL
+            END
+          ) as interview_avg_score,
+
+          -- Document completion
+          COUNT(DISTINCT d.id) FILTER (WHERE d.status = 'APPROVED') as documents_approved,
+          COUNT(DISTINCT d.id) as documents_total,
+          CASE
+            WHEN COUNT(DISTINCT d.id) > 0
+            THEN (COUNT(DISTINCT d.id) FILTER (WHERE d.status = 'APPROVED')::float / COUNT(DISTINCT d.id)::float * 100)
+            ELSE 0
+          END as document_completion_rate
+
+        FROM applications a
+        INNER JOIN students s ON s.id = a.student_id
+        LEFT JOIN guardians g ON g.id = s.guardian_id
+        LEFT JOIN evaluations e ON e.application_id = a.id
+        LEFT JOIN interviews i ON i.application_id = a.id
+        LEFT JOIN documents d ON d.application_id = a.id
+        WHERE ${whereClause}
+        GROUP BY a.id, s.id, s.first_name, s.last_name, s.grade_applied, a.status, a.created_at, g.first_name, g.last_name, g.email
+        ORDER BY ${sortMapping[sortColumn]} ${order}
+      `, params)
+    );
+
+    const applicants = applicantMetricsQuery.rows.map(row => ({
+      applicationId: row.application_id,
+      studentId: row.student_id,
+      studentName: row.student_name,
+      gradeApplied: row.grade_applied || 'No especificado',
+      applicationStatus: row.application_status,
+      applicationDate: row.application_date,
+      guardianName: row.guardian_name,
+      guardianEmail: row.guardian_email,
+      evaluationsCompleted: parseInt(row.evaluations_completed || 0),
+      evaluationsTotal: parseInt(row.evaluations_total || 0),
+      evaluationPassRate: parseFloat(row.evaluation_pass_rate || 0).toFixed(1),
+      evaluationAvgScore: row.evaluation_avg_score ? parseFloat(row.evaluation_avg_score).toFixed(1) : null,
+      familyInterviewsCompleted: parseInt(row.family_interviews_completed || 0),
+      interviewAvgScore: row.interview_avg_score ? parseFloat(row.interview_avg_score).toFixed(0) : null,
+      documentsApproved: parseInt(row.documents_approved || 0),
+      documentsTotal: parseInt(row.documents_total || 0),
+      documentCompletionRate: parseFloat(row.document_completion_rate || 0).toFixed(1)
+    }));
+
+    res.json({
+      success: true,
+      data: applicants,
+      meta: {
+        total: applicants.length,
+        academicYear: yearFilter,
+        filters: { grade, status },
+        sortBy: sortColumn,
+        sortOrder: order
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error('Error fetching applicant metrics:', error);
+
+    if (error.message && error.message.includes('breaker')) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service temporarily unavailable - circuit breaker open',
+        code: 'CIRCUIT_BREAKER_OPEN',
+        message: 'El servicio está temporalmente sobrecargado. Por favor, intenta nuevamente en unos minutos.',
+        retryAfter: 30
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener métricas de postulantes',
+      message: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+/**
  * @route   GET /api/analytics/grade-distribution
  * @desc    Get distribution of applications by grade
  * @access  Private
