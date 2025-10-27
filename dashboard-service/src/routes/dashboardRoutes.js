@@ -3,6 +3,9 @@ const router = express.Router();
 const DashboardController = require('../controllers/DashboardController');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { dbPool } = require('../config/database');
+const logger = require('../utils/logger');
+const cache = require('../config/cache');
+const { simpleQueryBreaker, mediumQueryBreaker, heavyQueryBreaker } = require('../config/circuitBreakers');
 
 /**
  * @route   GET /api/dashboard/stats
@@ -96,10 +99,6 @@ router.get(
  * @query   academicYear - Optional academic year filter (defaults to next year)
  */
 router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
-  const logger = require('../utils/logger');
-  const cache = require('../config/cache');
-  const { simpleQueryBreaker, mediumQueryBreaker, heavyQueryBreaker } = require('../config/circuitBreakers');
-
   const { academicYear } = req.query;
   const yearFilter = academicYear ? parseInt(academicYear) : new Date().getFullYear() + 1;
 
