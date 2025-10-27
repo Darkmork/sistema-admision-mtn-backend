@@ -1026,7 +1026,19 @@ Each service has its own README with:
 - Testing instructions
 - Deployment notes
 
-**Recent Changes (2025-10-25)**:
+**Recent Changes (2025-10-26)**:
+- **Dashboard Service 500 Error Fix** - Fixed runtime module loading issue
+  - Moved logger, cache, and circuitBreakers requires to top of dashboardRoutes.js
+  - Removed dynamic requires inside route handlers (anti-pattern)
+  - `/admin/detailed-stats` endpoint now fully functional
+  - Comprehensive dashboard statistics now loading successfully in frontend
+  - Commits: `73f2cbf` (port endpoint from monolith), `3fd1a11` (fix module requires)
+
+**Previous Changes (2025-10-25)**:
+- **Frontend HTTP Client Authentication** - Added JWT token injection to all API requests
+  - Fixed 401 Unauthorized errors in dashboard modal
+  - HTTP client now automatically includes auth_token or professor_token from localStorage
+  - Commit: `c16a20d`
 - **Document Review Email System** - Professional HTML email templates for document review notifications
   - Three email variants: all approved (congratulations), mixed approved/rejected (action required), only approved (progress)
   - Complete document status tracking with color-coded badges
