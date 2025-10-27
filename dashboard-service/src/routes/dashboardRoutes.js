@@ -401,7 +401,7 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
           a.created_at as application_date,
 
           -- Guardian info
-          COALESCE(g.first_name || ' ' || g.last_name, 'No registrado') as guardian_name,
+          COALESCE(g.full_name, 'No registrado') as guardian_name,
           COALESCE(g.email, 'No registrado') as guardian_email,
 
           -- Evaluation metrics
@@ -435,12 +435,12 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
 
         FROM applications a
         INNER JOIN students s ON s.id = a.student_id
-        LEFT JOIN guardians g ON g.id = s.guardian_id
+        LEFT JOIN guardians g ON g.id = a.guardian_id
         LEFT JOIN evaluations e ON e.application_id = a.id
         LEFT JOIN interviews i ON i.application_id = a.id
         LEFT JOIN documents d ON d.application_id = a.id
         WHERE ${whereClause}
-        GROUP BY a.id, s.id, s.first_name, s.last_name, s.grade_applied, a.status, a.created_at, g.first_name, g.last_name, g.email
+        GROUP BY a.id, s.id, s.first_name, s.last_name, s.grade_applied, a.status, a.created_at, g.full_name, g.email
         ORDER BY ${sortMapping[sortColumn]} ${order}
       `, params)
     );
