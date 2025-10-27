@@ -209,9 +209,9 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
       await client.query(`
         SELECT
           COUNT(*) as total,
-          COUNT(CASE WHEN status = 'SCHEDULED' THEN 1 END) as scheduled,
-          COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) as completed,
-          COUNT(CASE WHEN status = 'PENDING' THEN 1 END) as pending
+          COUNT(CASE WHEN i.status = 'SCHEDULED' THEN 1 END) as scheduled,
+          COUNT(CASE WHEN i.status = 'COMPLETED' THEN 1 END) as completed,
+          COUNT(CASE WHEN i.status = 'PENDING' THEN 1 END) as pending
         FROM interviews i
         JOIN applications a ON a.id = i.application_id
         WHERE EXTRACT(YEAR FROM a.created_at) = $1
