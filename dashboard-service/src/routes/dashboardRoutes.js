@@ -91,58 +91,243 @@ router.get(
 
 /**
  * @route   GET /api/dashboard/admin/detailed-stats
- * @desc    Get detailed admin statistics with filters
+ * @desc    Get comprehensive detailed admin statistics with academic year filter
  * @access  Private (ADMIN, COORDINATOR)
+ * @query   academicYear - Optional academic year filter (defaults to next year)
  */
 router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+  const logger = require('../utils/logger');
+  const cache = require('../config/cache');
+  const { simpleQueryBreaker, mediumQueryBreaker, heavyQueryBreaker } = require('../config/circuitBreakers');
+
+  const { academicYear } = req.query;
+  const yearFilter = academicYear ? parseInt(academicYear) : new Date().getFullYear() + 1;
+
+  // Check cache first
+  const cacheKey = `dashboard:detailed-stats:${yearFilter}`;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    logger.info(`[Cache HIT] dashboard:detailed-stats:${yearFilter}`);
+    return res.json(cached);
+  }
+  logger.info(`[Cache MISS] dashboard:detailed-stats:${yearFilter}`);
+
+  const client = await dbPool.connect();
   try {
-    const { startDate, endDate, status, grade } = req.query;
+    // 1. Entrevistas de la semana actual
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Domingo
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
 
-    let sqlQuery = 'SELECT * FROM applications WHERE 1=1';
-    const params = [];
-    let paramIndex = 1;
+    const weeklyInterviewsQuery = await mediumQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          COUNT(*) as total,
+          COUNT(CASE WHEN status = 'SCHEDULED' THEN 1 END) as scheduled,
+          COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) as completed
+        FROM interviews
+        WHERE scheduled_date >= $1 AND scheduled_date < $2
+      `, [startOfWeek.toISOString(), endOfWeek.toISOString()])
+    );
 
-    if (startDate) {
-      sqlQuery += ` AND created_at >= $${paramIndex}`;
-      params.push(startDate);
-      paramIndex++;
-    }
+    // 2. Evaluaciones pendientes por tipo
+    const pendingEvaluationsQuery = await mediumQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          evaluation_type,
+          COUNT(*) as count
+        FROM evaluations
+        WHERE status IN ('PENDING', 'IN_PROGRESS')
+        GROUP BY evaluation_type
+        ORDER BY count DESC
+      `, [])
+    );
 
-    if (endDate) {
-      sqlQuery += ` AND created_at <= $${paramIndex}`;
-      params.push(endDate);
-      paramIndex++;
-    }
+    // 3. Tendencias mensuales de postulaciones (últimos 12 meses)
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
-    if (status) {
-      sqlQuery += ` AND status = $${paramIndex}`;
-      params.push(status);
-      paramIndex++;
-    }
+    const monthlyTrendsQuery = await heavyQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          TO_CHAR(created_at, 'YYYY-MM') as month,
+          COUNT(*) as total,
+          COUNT(CASE WHEN status = 'SUBMITTED' THEN 1 END) as submitted,
+          COUNT(CASE WHEN status = 'APPROVED' THEN 1 END) as approved,
+          COUNT(CASE WHEN status = 'REJECTED' THEN 1 END) as rejected
+        FROM applications
+        WHERE created_at >= $1
+          AND EXTRACT(YEAR FROM created_at) = $2
+        GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+        ORDER BY month ASC
+      `, [twelveMonthsAgo.toISOString(), yearFilter])
+    );
 
-    const result = await dbPool.query(sqlQuery, params);
+    // 4. Estadísticas por estado (para el año seleccionado)
+    const statusStatsQuery = await mediumQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          status,
+          COUNT(*) as count
+        FROM applications
+        WHERE EXTRACT(YEAR FROM created_at) = $1
+        GROUP BY status
+      `, [yearFilter])
+    );
 
-    const stats = {
-      totalApplications: result.rows.length,
-      byStatus: {},
-      applications: result.rows
+    // 5. Años académicos disponibles
+    const academicYearsQuery = await simpleQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT DISTINCT EXTRACT(YEAR FROM created_at) as application_year
+        FROM applications
+        WHERE created_at IS NOT NULL
+        ORDER BY application_year DESC
+      `, [])
+    );
+
+    // 6. Breakdown por grado (grade distribution)
+    const gradeBreakdownQuery = await mediumQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          s.grade_applied as grade,
+          COUNT(*) as count,
+          COUNT(CASE WHEN a.status = 'APPROVED' THEN 1 END) as approved,
+          COUNT(CASE WHEN a.status = 'REJECTED' THEN 1 END) as rejected,
+          COUNT(CASE WHEN a.status = 'PENDING' THEN 1 END) as pending
+        FROM applications a
+        LEFT JOIN students s ON s.id = a.student_id
+        WHERE EXTRACT(YEAR FROM a.created_at) = $1
+          AND a.deleted_at IS NULL
+        GROUP BY s.grade_applied
+        ORDER BY count DESC
+      `, [yearFilter])
+    );
+
+    // 7. Métricas de entrevistas
+    const interviewMetricsQuery = await mediumQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          COUNT(*) as total,
+          COUNT(CASE WHEN status = 'SCHEDULED' THEN 1 END) as scheduled,
+          COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) as completed,
+          COUNT(CASE WHEN status = 'PENDING' THEN 1 END) as pending
+        FROM interviews i
+        JOIN applications a ON a.id = i.application_id
+        WHERE EXTRACT(YEAR FROM a.created_at) = $1
+      `, [yearFilter])
+    );
+
+    // 8. Métricas de evaluaciones
+    const evaluationMetricsQuery = await mediumQueryBreaker.fire(async () =>
+      await client.query(`
+        SELECT
+          COUNT(*) as total,
+          COUNT(CASE WHEN e.status = 'COMPLETED' THEN 1 END) as completed,
+          COUNT(CASE WHEN e.status = 'PENDING' THEN 1 END) as pending,
+          AVG(CASE WHEN e.score IS NOT NULL THEN e.score ELSE NULL END) as avg_score
+        FROM evaluations e
+        JOIN applications a ON a.id = e.application_id
+        WHERE EXTRACT(YEAR FROM a.created_at) = $1
+      `, [yearFilter])
+    );
+
+    // Construir respuesta
+    const weeklyInterviews = weeklyInterviewsQuery.rows[0];
+
+    const pendingEvaluations = {};
+    pendingEvaluationsQuery.rows.forEach(row => {
+      pendingEvaluations[row.evaluation_type] = parseInt(row.count);
+    });
+
+    const monthlyTrends = monthlyTrendsQuery.rows.map(row => ({
+      month: row.month,
+      total: parseInt(row.total),
+      submitted: parseInt(row.submitted),
+      approved: parseInt(row.approved),
+      rejected: parseInt(row.rejected)
+    }));
+
+    const statusBreakdown = {};
+    statusStatsQuery.rows.forEach(row => {
+      statusBreakdown[row.status.toLowerCase()] = parseInt(row.count);
+    });
+
+    const academicYears = academicYearsQuery.rows.map(row => parseInt(row.application_year));
+
+    // Grade breakdown with status counts
+    const gradeDistribution = gradeBreakdownQuery.rows.map(row => ({
+      grade: row.grade || 'Sin especificar',
+      total: parseInt(row.count),
+      approved: parseInt(row.approved),
+      rejected: parseInt(row.rejected),
+      pending: parseInt(row.pending)
+    }));
+
+    // Interview metrics
+    const interviewMetrics = {
+      total: parseInt(interviewMetricsQuery.rows[0]?.total || 0),
+      scheduled: parseInt(interviewMetricsQuery.rows[0]?.scheduled || 0),
+      completed: parseInt(interviewMetricsQuery.rows[0]?.completed || 0),
+      pending: parseInt(interviewMetricsQuery.rows[0]?.pending || 0),
+      completionRate: interviewMetricsQuery.rows[0]?.total > 0
+        ? (parseInt(interviewMetricsQuery.rows[0]?.completed || 0) / parseInt(interviewMetricsQuery.rows[0]?.total || 1)) * 100
+        : 0
     };
 
-    result.rows.forEach(row => {
-      stats.byStatus[row.status] = (stats.byStatus[row.status] || 0) + 1;
-    });
+    // Evaluation metrics
+    const evaluationMetrics = {
+      total: parseInt(evaluationMetricsQuery.rows[0]?.total || 0),
+      completed: parseInt(evaluationMetricsQuery.rows[0]?.completed || 0),
+      pending: parseInt(evaluationMetricsQuery.rows[0]?.pending || 0),
+      averageScore: parseFloat(evaluationMetricsQuery.rows[0]?.avg_score || 0)
+    };
 
-    res.json({
+    // Build complete detailed stats object
+    const detailedStats = {
+      academicYear: yearFilter,
+      totalApplications: Object.values(statusBreakdown).reduce((sum, val) => sum + val, 0),
+      statusBreakdown: statusBreakdown,
+      gradeDistribution: gradeDistribution,
+      monthlyTrends: monthlyTrends,
+      interviewMetrics: interviewMetrics,
+      evaluationMetrics: evaluationMetrics,
+      availableYears: academicYears
+    };
+
+    // Return response
+    const response = {
       success: true,
-      data: stats,
+      data: detailedStats,
+      ...detailedStats,  // Flatten fields to root for backward compatibility
       timestamp: new Date().toISOString()
-    });
+    };
+
+    // Cache for 5 minutes
+    cache.set(cacheKey, response, 300000);
+    res.json(response);
+
   } catch (error) {
+    logger.error('Error fetching detailed dashboard stats:', error);
+
+    if (error.message && error.message.includes('breaker')) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service temporarily unavailable - circuit breaker open',
+        code: 'CIRCUIT_BREAKER_OPEN',
+        message: 'El servicio está temporalmente sobrecargado. Por favor, intenta nuevamente en unos minutos.',
+        retryAfter: 30
+      });
+    }
+
     res.status(500).json({
       success: false,
       error: 'Error al obtener estadísticas detalladas',
-      details: error.message
+      message: error.message
     });
+  } finally {
+    client.release();
   }
 });
 
