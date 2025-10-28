@@ -40,7 +40,7 @@ router.get('/public/interviewers', async (req, res) => {
             AND s.is_active = true
         ) as schedule_count
       FROM users u
-      WHERE u.role IN ('TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR')
+      WHERE u.role IN ('TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR', 'INTERVIEWER')
         AND u.active = true
       ORDER BY u.role, u.last_name, u.first_name
     `);

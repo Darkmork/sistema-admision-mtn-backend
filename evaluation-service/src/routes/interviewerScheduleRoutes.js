@@ -468,7 +468,7 @@ router.get('/interviewers-with-schedules/:year', authenticate, async (req, res) 
       FROM users u
       INNER JOIN interviewer_schedules s ON u.id = s.interviewer_id
       WHERE s.year = $1 AND s.is_active = true
-        AND u.role IN ('TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR','INTERVIWER')
+        AND u.role IN ('TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR', 'INTERVIEWER')
         AND u.active = true
       GROUP BY u.id, u.first_name, u.last_name, u.email, u.role, u.subject
       ORDER BY u.last_name, u.first_name
