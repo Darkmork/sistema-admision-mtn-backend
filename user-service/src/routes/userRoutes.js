@@ -45,7 +45,7 @@ router.get('/public/school-staff', async (req, res) => {
       phone: user.phone,
       active: user.active,
       emailVerified: user.emailVerified,
-      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'INTERVIEWER', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
+      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'INTERVIEWER', 'CYCLE_DIRECTOR', 'COORDINATOR', 'INTERVIEWER'].includes(user.role)
     }));
 
     res.json({
