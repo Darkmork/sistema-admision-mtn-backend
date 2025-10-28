@@ -100,7 +100,7 @@ router.get('/interviewer/:interviewerId/year/:year', authenticate, async (req, r
 
 // POST /api/interviewer-schedules - Create a new schedule
 // Invalidates interviewer cache since schedule count changes
-router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'INTERVIEWER'), async (req, res) => {
   try {
     const { interviewer, dayOfWeek, startTime, endTime, year, specificDate, scheduleType, notes } = req.body;
     const interviewerId = interviewer?.id || interviewer;
@@ -109,6 +109,14 @@ router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR')
       return res.status(400).json({
         success: false,
         error: 'Faltan campos requeridos: interviewer, startTime, endTime'
+      });
+    }
+
+    // If user is INTERVIEWER, enforce ownership: can only create for self
+    if (req.user && req.user.role === 'INTERVIEWER' && parseInt(interviewerId) !== parseInt(req.user.userId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'No puedes crear horarios para otros usuarios'
       });
     }
 
@@ -164,7 +172,7 @@ router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR')
 });
 
 // POST /api/interviewer-schedules/interviewer/:interviewerId/recurring/:year - Create recurring schedules
-router.post('/interviewer/:interviewerId/recurring/:year', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+router.post('/interviewer/:interviewerId/recurring/:year', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'INTERVIEWER'), async (req, res) => {
   try {
     const { interviewerId, year } = req.params;
     const schedules = req.body;
@@ -173,6 +181,14 @@ router.post('/interviewer/:interviewerId/recurring/:year', authenticate, validat
       return res.status(400).json({
         success: false,
         error: 'Se requiere un array de horarios'
+      });
+    }
+
+    // If user is INTERVIEWER, enforce ownership: can only create for self
+    if (req.user && req.user.role === 'INTERVIEWER' && parseInt(interviewerId) !== parseInt(req.user.userId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'No puedes crear horarios para otros usuarios'
       });
     }
 
