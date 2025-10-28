@@ -511,4 +511,164 @@ router.get('/interviewers-with-schedules/:year', authenticate, async (req, res) 
   }
 });
 
+// POST /api/interviewer-schedules/toggle - Toggle a specific 30-min slot for a specific date
+// If slot exists (active), deactivate it. If it doesn't exist, create it.
+router.post('/toggle', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+  try {
+    const { interviewer, specificDate, startTime, endTime, year, notes } = req.body;
+    const interviewerId = interviewer?.id || interviewer;
+
+    if (!interviewerId || !specificDate || !startTime || !endTime || !year) {
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan campos requeridos: interviewer, specificDate, startTime, endTime, year'
+      });
+    }
+
+    // Buscar un horario SPECIFIC_DATE que cubra exactamente el rango indicado
+    const existing = await dbPool.query(`
+      SELECT id, is_active
+      FROM interviewer_schedules
+      WHERE interviewer_id = $1
+        AND schedule_type = 'SPECIFIC_DATE'
+        AND specific_date = $2
+        AND start_time = $3
+        AND end_time = $4
+        AND year = $5
+      ORDER BY id DESC
+      LIMIT 1
+    `, [interviewerId, specificDate, startTime, endTime, year]);
+
+    // Si existe y está activo → desactivar
+    if (existing.rows.length > 0 && existing.rows[0].is_active) {
+      await dbPool.query(`
+        UPDATE interviewer_schedules
+        SET is_active = false, updated_at = NOW()
+        WHERE id = $1
+      `, [existing.rows[0].id]);
+
+      if (req.evaluationCache) {
+        req.evaluationCache.invalidatePattern('interviewers:*');
+      }
+
+      return res.json({ success: true, toggled: 'deactivated', id: existing.rows[0].id });
+    }
+
+    // Si no existe o está inactivo → crear/activar
+    const result = await dbPool.query(`
+      INSERT INTO interviewer_schedules (
+        interviewer_id, day_of_week, start_time, end_time, year,
+        specific_date, schedule_type, notes, is_active
+      )
+      VALUES ($1, NULL, $2, $3, $4, $5, 'SPECIFIC_DATE', $6, true)
+      RETURNING id
+    `, [interviewerId, startTime, endTime, year, specificDate, notes || null]);
+
+    if (req.evaluationCache) {
+      req.evaluationCache.invalidatePattern('interviewers:*');
+    }
+
+    return res.status(201).json({ success: true, toggled: 'created', id: result.rows[0].id });
+  } catch (error) {
+    console.error('Error toggling schedule slot:', error);
+    return res.status(500).json({ success: false, error: 'Error al alternar horario', details: error.message });
+  }
+});
+
+// POST /api/interviewer-schedules/toggle-bulk - Toggle slots in 30-min intervals for a time range
+// Crea si no existe, desactiva si existe. Procesa en transacción.
+router.post('/toggle-bulk', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+  const client = await dbPool.connect();
+  try {
+    const { interviewer, specificDate, startTime, endTime, year, notes } = req.body;
+    const interviewerId = interviewer?.id || interviewer;
+
+    if (!interviewerId || !specificDate || !startTime || !endTime || !year) {
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan campos requeridos: interviewer, specificDate, startTime, endTime, year'
+      });
+    }
+
+    // Helpers para intervalos de 30 min
+    const parseTime = (t) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const formatTime = (mins) => {
+      const h = String(Math.floor(mins / 60)).padStart(2, '0');
+      const m = String(mins % 60).padStart(2, '0');
+      return `${h}:${m}`;
+    };
+
+    const startMins = parseTime(startTime);
+    const endMins = parseTime(endTime);
+    if (endMins <= startMins) {
+      return res.status(400).json({ success: false, error: 'endTime debe ser mayor que startTime' });
+    }
+
+    await client.query('BEGIN');
+
+    const results = [];
+    for (let m = startMins; m < endMins; m += 30) {
+      const slotStart = formatTime(m);
+      const slotEnd = formatTime(Math.min(m + 30, endMins));
+
+      // Buscar existente
+      const existing = await client.query(`
+        SELECT id, is_active
+        FROM interviewer_schedules
+        WHERE interviewer_id = $1
+          AND schedule_type = 'SPECIFIC_DATE'
+          AND specific_date = $2
+          AND start_time = $3
+          AND end_time = $4
+          AND year = $5
+        ORDER BY id DESC
+        LIMIT 1
+      `, [interviewerId, specificDate, slotStart, slotEnd, year]);
+
+      if (existing.rows.length > 0 && existing.rows[0].is_active) {
+        await client.query(`
+          UPDATE interviewer_schedules
+          SET is_active = false, updated_at = NOW()
+          WHERE id = $1
+        `, [existing.rows[0].id]);
+        results.push({ startTime: slotStart, endTime: slotEnd, action: 'deactivated', id: existing.rows[0].id });
+      } else if (existing.rows.length > 0) {
+        await client.query(`
+          UPDATE interviewer_schedules
+          SET is_active = true, updated_at = NOW(), notes = COALESCE($2, notes)
+          WHERE id = $1
+        `, [existing.rows[0].id, notes || null]);
+        results.push({ startTime: slotStart, endTime: slotEnd, action: 'activated', id: existing.rows[0].id });
+      } else {
+        const created = await client.query(`
+          INSERT INTO interviewer_schedules (
+            interviewer_id, day_of_week, start_time, end_time, year,
+            specific_date, schedule_type, notes, is_active
+          )
+          VALUES ($1, NULL, $2, $3, $4, $5, 'SPECIFIC_DATE', $6, true)
+          RETURNING id
+        `, [interviewerId, slotStart, slotEnd, year, specificDate, notes || null]);
+        results.push({ startTime: slotStart, endTime: slotEnd, action: 'created', id: created.rows[0].id });
+      }
+    }
+
+    await client.query('COMMIT');
+
+    if (req.evaluationCache) {
+      req.evaluationCache.invalidatePattern('interviewers:*');
+    }
+
+    return res.status(207).json({ success: true, count: results.length, results });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error toggling schedule slots in bulk:', error);
+    return res.status(500).json({ success: false, error: 'Error al alternar horarios en rango', details: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;
