@@ -245,7 +245,7 @@ router.get('/evaluators', authenticateToken, async (req, res) => {
       SELECT id, first_name as "firstName", last_name as "lastName", email, role,
              subject, rut, phone, active, email_verified as "emailVerified"
       FROM users
-      WHERE role IN ('TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR')
+      WHERE role IN ('TEACHER', 'PSYCHOLOGIST', 'CYCLE_DIRECTOR', 'COORDINATOR', 'INTERVIEWER')
     `;
 
     const params = [];
@@ -373,7 +373,7 @@ router.get('/staff', authenticateToken, async (req, res) => {
     const limit = parseInt(size);
 
     // Build WHERE clause
-    let whereConditions = [`role IN ('ADMIN', 'TEACHER', 'COORDINATOR', 'CYCLE_DIRECTOR', 'PSYCHOLOGIST')`];
+    let whereConditions = [`role IN ('ADMIN', 'TEACHER', 'COORDINATOR', 'CYCLE_DIRECTOR', 'PSYCHOLOGIST', 'INTERVIEWER')`];
     const params = [];
     let paramIndex = 1;
 
@@ -425,7 +425,7 @@ router.get('/staff', authenticateToken, async (req, res) => {
     const users = result.rows.map(user => ({
       ...user,
       fullName: `${user.firstName} ${user.lastName}`,
-      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'INTERVIEWER', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
+      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'INTERVIEWER', 'CYCLE_DIRECTOR', 'COORDINATOR', 'INTERVIEWER'].includes(user.role)
     }));
 
     res.json({
@@ -617,7 +617,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       phone: user.phone,
       active: user.active,
       emailVerified: user.email_verified,
-      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'INTERVIEWER', 'CYCLE_DIRECTOR', 'COORDINATOR'].includes(user.role)
+      canInterview: ['TEACHER', 'PSYCHOLOGIST', 'INTERVIEWER', 'CYCLE_DIRECTOR', 'COORDINATOR', 'INTERVIEWER'].includes(user.role)
     });
   } catch (error) {
     res.status(500).json({
