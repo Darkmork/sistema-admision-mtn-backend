@@ -1,30 +1,13 @@
-const now = () => new Date().toISOString();
+/**
+ * Response Helpers - Importado desde shared
+ * Standardized response formats for all microservices
+ */
 
-const ok = (data, meta = {}) => ({
-  success: true,
-  data,
-  timestamp: now(),
-  ...meta
-});
+// Importar desde shared para unificación
+const { ok, page, fail } = require('../../shared/utils/responseHelpers');
 
-const page = (data, total, page, limit) => ({
-  success: true,
-  data,
-  total,
+module.exports = {
+  ok,
   page,
-  limit,
-  totalPages: Math.ceil(total / limit),
-  timestamp: now()
-});
-
-const fail = (errorCode, message, details = null) => ({
-  success: false,
-  error: {
-    code: errorCode,
-    message,
-    ...(details && { details })
-  },
-  timestamp: now()
-});
-
-module.exports = { ok, page, fail };
+  fail
+};
