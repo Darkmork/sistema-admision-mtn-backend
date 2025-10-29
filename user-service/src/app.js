@@ -5,6 +5,7 @@
 
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const { createDatabasePool } = require('./config/database');
 const { createCircuitBreakers } = require('./config/circuitBreaker');
 const { generateCsrfToken } = require('./middleware/csrfMiddleware');
@@ -44,9 +45,33 @@ const initializeApp = () => {
 // But allow it to be overridden by server.js
 initializeApp();
 
-// Middleware
-// NOTE: CORS is handled by the API Gateway, not by individual services
+// CORS configuration - Required because Railway gateway redirects instead of proxying
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'https://admision-mtn-front.vercel.app',
+  process.env.CORS_ORIGIN || process.env.FRONTEND_URL
+].filter(Boolean);
 
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Blocked request from origin: ${origin}`);
+      callback(null, false);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token', 'X-CSRF-Token'],
+  exposedHeaders: ['x-request-id']
+}));
+
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
