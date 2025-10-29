@@ -1,6 +1,10 @@
+/**
+ * Express Application
+ * Main application setup with middleware and routes
+ */
+
 require('dotenv').config();
 const express = require('express');
-const path = require('path');
 const { createDatabasePool } = require('./config/database');
 const { createCircuitBreakers } = require('./config/circuitBreaker');
 const { generateCsrfToken } = require('./middleware/csrfMiddleware');
@@ -10,22 +14,35 @@ const userRoutes = require('./routes/userRoutes');
 const debugRoutes = require('./routes/debugRoutes');
 
 const app = express();
-const port = process.env.PORT || 8082;
 
-// Initialize database pool
-const dbPool = createDatabasePool();
+let dbPool;
+let simpleQueryBreaker, mediumQueryBreaker, writeOperationBreaker;
+let userCache;
 
-// Initialize circuit breakers
-const { simpleQueryBreaker, mediumQueryBreaker, writeOperationBreaker} = createCircuitBreakers();
+// Initialize database pool (will be passed to routes)
+const initializeApp = () => {
+  // Initialize database pool
+  dbPool = createDatabasePool();
 
-// Initialize cache
-const userCache = new SimpleCache({
-  defaultTTL: 600000, // 10 minutes default
-  maxSize: 2000,
-  enableStats: true
-});
+  // Initialize circuit breakers
+  const breakers = createCircuitBreakers();
+  simpleQueryBreaker = breakers.simpleQueryBreaker;
+  mediumQueryBreaker = breakers.mediumQueryBreaker;
+  writeOperationBreaker = breakers.writeOperationBreaker;
 
-console.log('✅ SimpleCache initialized (TTL: 10min, MaxSize: 2000)');
+  // Initialize cache
+  userCache = new SimpleCache({
+    defaultTTL: 600000, // 10 minutes default
+    maxSize: 2000,
+    enableStats: true
+  });
+
+  console.log('✅ SimpleCache initialized (TTL: 10min, MaxSize: 2000)');
+};
+
+// Call initialization immediately for backward compatibility
+// But allow it to be overridden by server.js
+initializeApp();
 
 // Middleware
 // NOTE: CORS is handled by the API Gateway, not by individual services
@@ -55,7 +72,6 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'UP',
     service: 'user-service',
-    port: port,
     timestamp: new Date().toISOString()
   });
 });
@@ -116,6 +132,15 @@ app.get('/api/users/cache/stats', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 
+// 404 handler
+app.use((req, res) => {
+  console.warn(`404 Not Found: ${req.method} ${req.path}`);
+  res.status(404).json({
+    success: false,
+    error: `Route ${req.method} ${req.path} not found`
+  });
+});
+
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
@@ -126,13 +151,5 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-// En Railway, escuchar en 0.0.0.0 permite conexiones desde otros servicios en la red privada
-app.listen(port, '0.0.0.0', () => {
-  console.log(`✅ User Service running on port ${port}`);
-  console.log(`✅ Listening on 0.0.0.0:${port} (accessible via private network)`);
-  console.log('✅ Database connection pooling enabled');
-  console.log('✅ Circuit breakers enabled (Simple, Medium, Write)');
-});
-
 module.exports = app;
+

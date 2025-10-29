@@ -34,9 +34,49 @@ const createDatabasePool = () => {
   console.log(`[DB] Using ${process.env.DATABASE_URL ? 'Railway DATABASE_URL' : 'local environment variables'}`);
   console.log('[DB] Connection pooling enabled: max 20 connections');
 
+  // Pool event handlers
+  dbPool.on('connect', () => {
+    console.log('[DB] New database connection established');
+  });
+
+  dbPool.on('error', (err) => {
+    console.error('[DB] Unexpected database pool error:', err);
+  });
+
+  dbPool.on('remove', () => {
+    console.log('[DB] Database connection removed from pool');
+  });
+
   return dbPool;
 };
 
+// Test database connection
+const testConnection = async (dbPool) => {
+  try {
+    const client = await dbPool.connect();
+    const result = await client.query('SELECT NOW()');
+    client.release();
+    console.log('[DB] Database connection test successful:', result.rows[0]);
+    return true;
+  } catch (error) {
+    console.error('[DB] Database connection test failed:', error);
+    return false;
+  }
+};
+
+// Graceful shutdown
+const closePool = async (dbPool) => {
+  try {
+    await dbPool.end();
+    console.log('[DB] Database pool closed successfully');
+  } catch (error) {
+    console.error('[DB] Error closing database pool:', error);
+    throw error;
+  }
+};
+
 module.exports = {
-  createDatabasePool
+  createDatabasePool,
+  testConnection,
+  closePool
 };
