@@ -29,7 +29,7 @@ router.get('/public/interviewers', async (req, res) => {
         u.role,
         u.subject,
         CASE
-          WHEN u.role IN ('CYCLE_DIRECTOR', 'PSYCHOLOGIST') THEN 'ALL'
+          WHEN u.role IN ('CYCLE_DIRECTOR', 'PSYCHOLOGIST', 'INTERVIEWER') THEN 'ALL'
           WHEN u.subject LIKE '%MATH%' OR u.subject LIKE '%SCIENCE%' THEN 'SECONDARY'
           ELSE 'PRIMARY'
         END as educational_level,
