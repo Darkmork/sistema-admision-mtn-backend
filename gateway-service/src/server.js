@@ -343,7 +343,7 @@ const makeProxy = (target, path = '', additionalOptions = {}) => {
     timeout: 20000, // Client timeout (20s)
     proxyTimeout: 15000, // Backend timeout (15s)
     followRedirects: false, // Don't follow redirects, proxy them
-    autoRewrite: true, // Rewrite the location host/port on redirects
+    autoRewrite: false, // DISABLED: Was causing redirect loops on Railway (301 redirecting to same URL)
     selfHandleResponse: false, // Let proxy handle the response (don't intercept)
     // If path is provided, prepend it back (Express strips it)
     ...(path && {
