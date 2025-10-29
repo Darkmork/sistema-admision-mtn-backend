@@ -3,6 +3,7 @@ const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const http = require('http');
 const https = require('https');
+const axios = require('axios');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
@@ -383,8 +384,82 @@ const makeProxy = (target, path = '', additionalOptions = {}) => {
       logger.debug(`[${req.id}] Proxying ${req.method} ${req.originalUrl} to ${target}`);
     },
 
-    onProxyRes: (proxyRes, req, res) => {
+    onProxyRes: async (proxyRes, req, res) => {
       logger.info(`[${req.id}] Proxy response from ${target}: ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
+      
+      // Intercept redirects (301/302) from Railway and follow them internally
+      if (proxyRes.statusCode === 301 || proxyRes.statusCode === 302) {
+        const location = proxyRes.headers.location;
+        if (location && !res.headersSent) {
+          logger.warn(`[${req.id}] Intercepted ${proxyRes.statusCode} redirect to ${location}. Following internally.`);
+          
+          try {
+            // Follow redirect internally and proxy the response
+            const redirectUrl = new URL(location);
+            
+            // Prepare headers (exclude host, as axios will set it)
+            const headers = { ...req.headers };
+            delete headers.host;
+            delete headers['content-length'];
+            
+            // For GET/HEAD requests, don't send body
+            const requestConfig = {
+              method: req.method,
+              url: location,
+              headers,
+              validateStatus: () => true, // Don't throw on any status
+              maxRedirects: 0, // Don't follow redirects automatically
+              timeout: 15000,
+              withCredentials: false
+            };
+            
+            // Only add body for methods that support it
+            if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
+              requestConfig.data = req.body;
+            }
+            
+            const redirectResponse = await axios(requestConfig);
+            
+            // Copy CORS headers from redirect response if present
+            const corsHeaders = {
+              'access-control-allow-origin': redirectResponse.headers['access-control-allow-origin'] || req.headers.origin,
+              'access-control-allow-credentials': redirectResponse.headers['access-control-allow-credentials'] || 'true',
+              'access-control-allow-methods': redirectResponse.headers['access-control-allow-methods'] || 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+              'access-control-allow-headers': redirectResponse.headers['access-control-allow-headers'] || 'Content-Type, Authorization, x-csrf-token, X-CSRF-Token'
+            };
+            
+            // Send the actual response from the redirected service
+            res.status(redirectResponse.status);
+            Object.entries(corsHeaders).forEach(([key, value]) => {
+              if (value) res.setHeader(key, value);
+            });
+            Object.entries(redirectResponse.headers).forEach(([key, value]) => {
+              // Skip headers that should be set by Express
+              if (!['content-length', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
+                if (key.toLowerCase().startsWith('access-control')) {
+                  // Use our CORS headers instead
+                  return;
+                }
+                res.setHeader(key, value);
+              }
+            });
+            res.send(redirectResponse.data);
+            return;
+          } catch (error) {
+            logger.error(`[${req.id}] Error following redirect to ${location}:`, error.message);
+            // Fall through to normal proxy handling
+          }
+        }
+      }
+      
+      // Ensure CORS headers are present for redirected requests (fallback)
+      if (!proxyRes.headers['access-control-allow-origin'] && req.headers.origin) {
+        const origin = req.headers.origin;
+        if (allowedOrigins.indexOf(origin) !== -1) {
+          proxyRes.headers['access-control-allow-origin'] = origin;
+          proxyRes.headers['access-control-allow-credentials'] = 'true';
+        }
+      }
     },
 
     onError: (err, req, res) => {
