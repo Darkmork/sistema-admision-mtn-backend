@@ -19,7 +19,8 @@ user-service/
 │   │   └── userRoutes.js
 │   ├── middleware/      # Middlewares (auth, validation)
 │   │   └── authMiddleware.js
-│   └── index.js         # Punto de entrada
+│   ├── app.js           # Configuración de Express
+│   └── server.js        # Punto de entrada
 ├── package.json
 ├── .env                 # Variables de entorno
 ├── .gitignore
@@ -142,7 +143,8 @@ curl http://localhost:8082/api/users \
 
 ### Separación de Responsabilidades
 
-- **index.js**: Configuración de Express, middlewares, inicialización
+- **server.js**: Entry point con graceful shutdown
+- **app.js**: Configuración de Express, middlewares, inicialización
 - **config/**: Configuración de base de datos y circuit breakers
 - **routes/**: Definición de endpoints HTTP
 - **controllers/**: Manejo de requests/responses
@@ -171,7 +173,7 @@ COPY package*.json ./
 RUN npm ci --only=production
 COPY src ./src
 EXPOSE 8082
-CMD ["node", "src/index.js"]
+CMD ["node", "src/server.js"]
 ```
 
 ## 📝 Notas
@@ -187,7 +189,7 @@ CMD ["node", "src/index.js"]
 2. WebStorm detectará automáticamente el proyecto Node.js
 3. Configurar Run Configuration:
    - **Name**: User Service
-   - **JavaScript file**: `src/index.js`
+   - **JavaScript file**: `src/server.js`
    - **Environment variables**: From `.env` file
 4. Click en Run
 

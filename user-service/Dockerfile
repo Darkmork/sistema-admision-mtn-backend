@@ -29,4 +29,4 @@ EXPOSE 8082
 
 # Start application
 # Note: HEALTHCHECK removed - Railway handles health checks via TCP connection
-CMD ["node", "src/index.js"]
+CMD ["node", "src/server.js"]

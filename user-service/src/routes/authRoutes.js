@@ -6,7 +6,7 @@ const { getPublicKeyInfo, decryptCredentialsMiddleware } = require('../utils/enc
 
 const router = express.Router();
 
-// Initialize controller (will be set up in index.js with dependencies)
+// Initialize controller (will be set up in app.js with dependencies)
 let authController;
 
 router.use((req, res, next) => {
