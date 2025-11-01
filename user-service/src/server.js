@@ -28,10 +28,10 @@ const startServer = async () => {
     }
 
     // Start HTTP server
-    // Railway: Must listen on 0.0.0.0 to be accessible via Private Networking
-    server = app.listen(PORT, '0.0.0.0', () => {
+    // Railway: Must listen on :: (IPv6) to be accessible via Private Networking
+    server = app.listen(PORT, '::', () => {
       console.log(`✅ ${SERVICE_NAME} started successfully`);
-      console.log(`✅ Listening on 0.0.0.0:${PORT} (accessible via private network)`);
+      console.log(`✅ Listening on [::]:${PORT} (IPv6 - accessible via Railway private network)`);
       console.log(`✅ Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`✅ Health check: http://localhost:${PORT}/health`);
       console.log('✅ Database connection pooling enabled');

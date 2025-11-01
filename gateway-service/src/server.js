@@ -566,11 +566,11 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-// En Railway, escuchar en 0.0.0.0 permite conexiones públicas y desde otros servicios
-const server = app.listen(PORT, '0.0.0.0', () => {
+// En Railway, escuchar en :: (IPv6) permite conexiones públicas y desde otros servicios via Private Networking
+const server = app.listen(PORT, '::', () => {
   logger.info(`==============================================`);
   logger.info(`🚀 API Gateway running on port ${PORT}`);
-  logger.info(`📡 Listening on 0.0.0.0:${PORT} (accessible publicly and via private network)`);
+  logger.info(`📡 Listening on [::]:${PORT} (IPv6 - accessible publicly and via Railway private network)`);
   logger.info(`Type: Express Gateway with Centralized JWT Auth`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`Health check: http://localhost:${PORT}/health`);
