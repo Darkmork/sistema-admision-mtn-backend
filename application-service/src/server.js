@@ -4,25 +4,21 @@
  */
 
 const app = require('./app');
-const { createDatabasePool, testConnection, closePool } = require('./config/database');
+const { dbPool, testConnection, closePool } = require('./config/database');
 const logger = require('./utils/logger');
 
 const PORT = process.env.PORT || 8083;
 const SERVICE_NAME = process.env.SERVICE_NAME || 'application-service';
 
 let server;
-let dbPool;
 
 /**
  * Start server
  */
 const startServer = async () => {
   try {
-    // Initialize database pool
-    dbPool = createDatabasePool();
-
     // Test database connection
-    const dbConnected = await testConnection(dbPool);
+    const dbConnected = await testConnection();
     if (!dbConnected) {
       logger.error('Failed to connect to database. Exiting...');
       process.exit(1);
@@ -66,10 +62,8 @@ const gracefulShutdown = async (signal) => {
       logger.info('HTTP server closed');
 
       try {
-        if (dbPool) {
-          await closePool(dbPool);
-          logger.info('Database connections closed');
-        }
+        await closePool();
+        logger.info('Database connections closed');
         logger.info('Graceful shutdown completed');
         process.exit(0);
       } catch (error) {
