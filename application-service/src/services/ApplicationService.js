@@ -22,6 +22,8 @@ class ApplicationService {
       let query = `
         SELECT a.*,
                s.rut as student_rut,
+               s.nationality as student_nationality,
+               s.passport as student_passport,
                s.first_name as student_first_name,
                s.paternal_last_name as student_paternal_last_name,
                s.maternal_last_name as student_maternal_last_name,
@@ -176,6 +178,8 @@ class ApplicationService {
           s.paternal_last_name as student_paternal_last_name,
           s.maternal_last_name as student_maternal_last_name,
           s.rut as student_rut,
+          s.nationality as student_nationality,
+          s.passport as student_passport,
           s.birth_date as student_birth_date,
           s.grade_applied as student_grade,
           s.current_school as student_current_school,
@@ -277,6 +281,8 @@ class ApplicationService {
           lastName: `${row.student_paternal_last_name || ''} ${row.student_maternal_last_name || ''}`.trim(),
           fullName: `${row.student_first_name || ''} ${row.student_paternal_last_name || ''} ${row.student_maternal_last_name || ''}`.trim(),
           rut: row.student_rut,
+          nationality: row.student_nationality || 'CHILENA',
+          passport: row.student_passport,
           birthDate: row.student_birth_date,
           gradeApplied: row.student_grade,
           currentSchool: row.student_current_school || 'No especificado',
@@ -366,15 +372,17 @@ class ApplicationService {
       const studentResult = await dbPool.query(
         `INSERT INTO students (
           first_name, paternal_last_name, maternal_last_name,
-          rut, birth_date, grade_applied, current_school, address, email,
+          rut, nationality, passport, birth_date, grade_applied, current_school, address, email,
           admission_preference, pais, region, comuna, additional_notes, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
         RETURNING id`,
         [
           applicationData.studentFirstName,
           applicationData.studentPaternalLastName,
           applicationData.studentMaternalLastName || '',
-          applicationData.studentRUT,
+          applicationData.studentRUT || null,
+          applicationData.nationality || 'CHILENA',
+          applicationData.passport || null,
           applicationData.studentDateOfBirth,
           applicationData.gradeAppliedFor,
           applicationData.studentCurrentSchool || '',
