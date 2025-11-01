@@ -4,33 +4,39 @@
  */
 
 const app = require('./app');
-const { testConnection, closePool } = require('./config/database');
+const { createDatabasePool, testConnection, closePool } = require('./config/database');
 const logger = require('./utils/logger');
 
 const PORT = process.env.PORT || 8083;
 const SERVICE_NAME = process.env.SERVICE_NAME || 'application-service';
 
 let server;
+let dbPool;
 
 /**
  * Start server
  */
 const startServer = async () => {
   try {
+    // Initialize database pool
+    dbPool = createDatabasePool();
+
     // Test database connection
-    const dbConnected = await testConnection();
+    const dbConnected = await testConnection(dbPool);
     if (!dbConnected) {
       logger.error('Failed to connect to database. Exiting...');
       process.exit(1);
     }
 
     // Start HTTP server
-    // Railway: Must listen on 0.0.0.0 to be accessible via Private Networking
-    server = app.listen(PORT, '0.0.0.0', () => {
+    // Railway: Must listen on :: (IPv6) to be accessible via Private Networking
+    server = app.listen(PORT, '::', () => {
       logger.info(`${SERVICE_NAME} started successfully`);
-      logger.info(`Listening on 0.0.0.0:${PORT} (accessible via private network)`);
+      logger.info(`Listening on [::]:${PORT} (IPv6 - accessible via Railway private network)`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`Health check: http://localhost:${PORT}/health`);
+      logger.info(`Database connection pooling enabled`);
+      logger.info(`Circuit breakers enabled (Simple, Medium, Write)`);
     });
 
     // Handle server errors
@@ -60,8 +66,10 @@ const gracefulShutdown = async (signal) => {
       logger.info('HTTP server closed');
 
       try {
-        await closePool();
-        logger.info('Database connections closed');
+        if (dbPool) {
+          await closePool(dbPool);
+          logger.info('Database connections closed');
+        }
         logger.info('Graceful shutdown completed');
         process.exit(0);
       } catch (error) {
