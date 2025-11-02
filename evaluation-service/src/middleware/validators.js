@@ -12,20 +12,20 @@ const createEvaluationSchema = Joi.object({
   score: Joi.number().min(0).required(),
   maxScore: Joi.number().min(1).required(),
   status: Joi.string().valid('PENDING', 'IN_PROGRESS', 'COMPLETED').optional(), // Optional status
-  strengths: Joi.string().max(1000).allow('', null),
-  areasForImprovement: Joi.string().max(1000).allow('', null),
-  observations: Joi.string().max(2000).allow('', null),
-  recommendations: Joi.string().max(2000).allow('', null)
+  strengths: Joi.string().max(5000).allow('', null), // Increased from 1000 to 5000 for detailed feedback
+  areasForImprovement: Joi.string().max(5000).allow('', null), // Increased from 1000 to 5000
+  observations: Joi.string().max(10000).allow('', null), // Increased from 2000 to 10000 for admission reports
+  recommendations: Joi.string().max(5000).allow('', null) // Increased from 2000 to 5000
 }).unknown(false); // Explicitly reject unknown fields to catch issues
 
 // Evaluation update schema
 const updateEvaluationSchema = Joi.object({
   score: Joi.number().min(0),
   maxScore: Joi.number().min(1),
-  strengths: Joi.string().max(1000).allow('', null),
-  areasForImprovement: Joi.string().max(1000).allow('', null),
-  observations: Joi.string().max(2000).allow('', null),
-  recommendations: Joi.string().max(2000).allow('', null),
+  strengths: Joi.string().max(5000).allow('', null), // Increased from 1000 to 5000 for detailed feedback
+  areasForImprovement: Joi.string().max(5000).allow('', null), // Increased from 1000 to 5000
+  observations: Joi.string().max(10000).allow('', null), // Increased from 2000 to 10000 for admission reports
+  recommendations: Joi.string().max(5000).allow('', null), // Increased from 2000 to 5000
   status: Joi.string().valid('PENDING', 'COMPLETED', 'CANCELLED')
 }).min(1);
 
