@@ -14,10 +14,10 @@ const startServer = async () => {
     client.release();*/
 
     // Start HTTP server
-    // Railway: Must listen on 0.0.0.0 to be accessible via Private Networking
-    server = app.listen(PORT, '0.0.0.0', () => {
+    // Railway: Must listen on :: (IPv6) to be accessible via Private Networking
+    server = app.listen(PORT, '::', () => {
       logger.info(`Guardian Service running on port ${PORT}`);
-      logger.info(`Listening on 0.0.0.0:${PORT} (accessible via private network)`);
+      logger.info(`Listening on [::]:${PORT} (IPv6 - accessible via Railway private network)`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
       logger.info(`RUT validation: ${process.env.RUT_VALIDATION_ENABLED !== 'false' ? 'enabled' : 'disabled'}`);
       logger.info(`Health check: http://localhost:${PORT}/health`);
