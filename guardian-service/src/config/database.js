@@ -41,10 +41,7 @@ dbPool.on('remove', () => {
   logger.debug('Database connection removed from pool');
 });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, closing database connections...');
-  await dbPool.end();
-});
+// Note: SIGTERM handling is done in server.js to avoid double-shutdown
+// DO NOT add process.on('SIGTERM') here
 
 module.exports = { dbPool };
