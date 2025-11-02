@@ -56,6 +56,11 @@ class FamilyInterviewTemplateService {
     const filteredSections = {};
 
     for (const [sectionKey, sectionData] of Object.entries(template.sections)) {
+      // Skip observations section (it has a different structure)
+      if (sectionKey === 'observations') {
+        continue;
+      }
+
       const filteredQuestions = {};
 
       for (const [questionKey, questionData] of Object.entries(sectionData.questions)) {
