@@ -649,7 +649,7 @@ router.get('/:evaluationId/family-interview-data', authenticate, async (req, res
 });
 
 // PUT /api/evaluations/:evaluationId/family-interview-data - Save interview responses
-router.put('/:evaluationId/family-interview-data', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'PSYCHOLOGIST'), async (req, res) => {
+router.put('/:evaluationId/family-interview-data', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'PSYCHOLOGIST', 'TEACHER', 'CYCLE_DIRECTOR', 'INTERVIEWER'), async (req, res) => {
   try {
     const { evaluationId } = req.params;
     const { interviewData } = req.body;
