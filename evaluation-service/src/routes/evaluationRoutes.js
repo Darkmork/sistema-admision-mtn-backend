@@ -291,6 +291,27 @@ router.get('/subject/:subject', authenticate, async (req, res) => {
 // Get my evaluations (must be before /:id route)
 router.get('/my-evaluations', authenticate, EvaluationController.getMyEvaluations.bind(EvaluationController));
 
+// GET /api/evaluations/family-interview-template/:grade - Get template for specific grade (MUST BE BEFORE /:id)
+router.get('/family-interview-template/:grade', authenticate, async (req, res) => {
+  try {
+    const familyInterviewService = require('../services/FamilyInterviewTemplateService');
+    const { grade } = req.params;
+
+    const template = familyInterviewService.getTemplateForGrade(grade);
+
+    return res.json({
+      success: true,
+      data: template
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Error loading family interview template',
+      details: error.message
+    });
+  }
+});
+
 router.get('/:id', authenticate, EvaluationController.getEvaluationById.bind(EvaluationController));
 
 router.post(
@@ -591,6 +612,82 @@ router.post('/bulk/assign', authenticate, validateCsrf, requireRole('ADMIN', 'CO
     res.status(500).json({
       success: false,
       error: 'Error al asignar evaluaciones en lote',
+      details: error.message
+    });
+  }
+});
+
+// GET /api/evaluations/:evaluationId/family-interview-data - Get saved interview responses
+router.get('/:evaluationId/family-interview-data', authenticate, async (req, res) => {
+  try {
+    const { evaluationId } = req.params;
+
+    const result = await dbPool.query(
+      'SELECT interview_data, score FROM evaluations WHERE id = $1',
+      [evaluationId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Evaluation not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: result.rows[0].interview_data || {},
+      score: result.rows[0].score
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Error retrieving interview data',
+      details: error.message
+    });
+  }
+});
+
+// PUT /api/evaluations/:evaluationId/family-interview-data - Save interview responses
+router.put('/:evaluationId/family-interview-data', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'PSYCHOLOGIST'), async (req, res) => {
+  try {
+    const { evaluationId } = req.params;
+    const { interviewData } = req.body;
+    const familyInterviewService = require('../services/FamilyInterviewTemplateService');
+
+    // Calculate score from responses
+    const totalScore = familyInterviewService.calculateScore(interviewData);
+
+    const result = await dbPool.query(
+      `UPDATE evaluations
+       SET interview_data = $1,
+           score = $2,
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [JSON.stringify(interviewData), totalScore, evaluationId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Evaluation not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Interview data saved successfully',
+      data: {
+        evaluationId: evaluationId,
+        totalScore: totalScore,
+        interview_data: result.rows[0].interview_data
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Error saving interview data',
       details: error.message
     });
   }
