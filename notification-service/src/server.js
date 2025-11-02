@@ -18,10 +18,11 @@ try {
 // Create HTTP server
 const server = http.createServer(app);
 
-// Start listening
-server.listen(PORT, '0.0.0.0', () => {
+// Railway: Must listen on :: (IPv6) to be accessible via Private Networking
+server.listen(PORT, '::', () => {
   console.log(`✅ [SIMPLE] Notification Service running on port ${PORT}`);
-  console.log(`🏥 [SIMPLE] Health check: http://0.0.0.0:${PORT}/health`);
+  console.log(`✅ [SIMPLE] Listening on [::]:${PORT} (IPv6 - accessible via Railway private network)`);
+  console.log(`🏥 [SIMPLE] Health check: http://localhost:${PORT}/health`);
 });
 
 // Handle server errors
