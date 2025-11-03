@@ -26,7 +26,7 @@ class InterviewService {
         params.push(status);
       }
       if (interviewerId) {
-        query += ` AND interviewer_id = $${paramIndex++}`;
+        query += ` AND interviewer_user_id = $${paramIndex++}`;
         params.push(interviewerId);
       }
 
@@ -52,7 +52,7 @@ class InterviewService {
         countParams.push(status);
       }
       if (interviewerId) {
-        countQuery += ` AND interviewer_id = $${countIndex++}`;
+        countQuery += ` AND interviewer_user_id = $${countIndex++}`;
         countParams.push(interviewerId);
       }
 
@@ -438,7 +438,7 @@ class InterviewService {
     return await mediumQueryBreaker.fire(async () => {
       const result = await dbPool.query(
         `SELECT * FROM interviews
-         WHERE interviewer_id = $1
+         WHERE interviewer_user_id = $1
          AND scheduled_date = $2
          AND status IN ('SCHEDULED', 'RESCHEDULED')
          AND (
