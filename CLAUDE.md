@@ -1878,6 +1878,42 @@ curl http://localhost:5173  # Frontend loads
   - Verify hostname detection logic in `api.config.ts`
   - Test manually: call `debugApiConfig()` in browser Console
 
+**Issue: "No hay horarios disponibles" despite API successfully returning time slots (Interview Scheduling)**
+- **Symptoms**:
+  - Console logs show successful API calls with data (e.g., `✅ Horarios comunes obtenidos (5 slots): ['13:00', '13:30', ...]`)
+  - UI displays empty state message "No hay horarios disponibles para Evaluador en esta fecha"
+  - No error messages (silent failure)
+- **Root Cause**:
+  - **Race condition**: Multiple rapid API calls when selecting second interviewer for FAMILY interviews, causing state updates with stale data
+  - **Duplicate API calls**: Parent component (`InterviewForm`) and child component (`DayScheduleSelector`) independently loading the same data, creating parallel state systems
+- **Fix**:
+  1. **Race condition solution** (InterviewForm.tsx:1007-1090):
+     - Implemented `useRef` for tracking: `loadingSlotsRef`, `abortControllerRef`, `debounceTimerRef`
+     - Added `AbortController` to cancel outdated API calls
+     - Added 300ms debouncing in useEffect
+     - Only update state if call wasn't aborted
+     - Enhanced logging with unique timestamps for tracing
+  2. **Duplicate API calls solution** (Commit: 73ce9c2):
+     - Modified `DayScheduleSelector.tsx` to accept optional `availableTimeSlots` and `isLoadingSlots` props
+     - When props are provided, component uses those instead of making its own API calls
+     - Parent (`InterviewForm`) now passes both props to child (`DayScheduleSelector`)
+     - Created single source of truth for time slot data
+     - Maintained backward compatibility (component still works standalone)
+- **How to recognize**:
+  - Look for alternating console logs showing different slot counts (5 slots → [] → 5 slots)
+  - Check for multiple API calls with same parameters in Network tab
+  - Verify both parent and child components are loading the same data
+- **Code References**:
+  - DayScheduleSelector.tsx:21-22 (new props)
+  - DayScheduleSelector.tsx:34-44 (prop usage logic)
+  - DayScheduleSelector.tsx:47-62 (skip loading if props provided)
+  - InterviewForm.tsx:1066-1067 (passing props to child)
+- **Prevention**:
+  - Always pass data as props from parent to child instead of letting child fetch independently
+  - Use AbortController for all async operations in useEffect
+  - Add debouncing for operations triggered by rapid state changes
+  - Include unique correlation IDs in logs for tracing race conditions
+
 ### Frontend Development Workflow
 
 **Adding a new feature:**
