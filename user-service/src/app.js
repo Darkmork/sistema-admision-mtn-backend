@@ -101,23 +101,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// CSRF token endpoint (public)
-app.get('/api/csrf-token', (req, res) => {
-  try {
-    const token = generateCsrfToken();
-    res.json({
-      success: true,
-      csrfToken: token,
-      expiresIn: 3600 // 1 hour in seconds
-    });
-  } catch (error) {
-    console.error('Error generating CSRF token:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to generate CSRF token'
-    });
-  }
-});
+// CSRF token endpoint removed - now only available at /api/auth/csrf-token via authRoutes.js
 
 // Cache management endpoints
 app.post('/api/users/cache/clear', (req, res) => {
