@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrevista Reagendada - Colegio Monte Tabor y Nazaret</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f4f4f4;
+      padding: 20px;
+    }
+
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .header {
+      background: linear-gradient(135deg, #0277bd 0%, #01579b 100%);
+      color: white;
+      padding: 30px 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+
+    .header p {
+      font-size: 14px;
+      opacity: 0.95;
+    }
+
+    .content {
+      padding: 30px 20px;
+    }
+
+    .greeting {
+      font-size: 16px;
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .alert-box {
+      background-color: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 15px;
+      margin-bottom: 25px;
+      border-radius: 4px;
+    }
+
+    .alert-box p {
+      margin: 0;
+      color: #0d47a1;
+      font-weight: 500;
+      font-size: 15px;
+    }
+
+    .comparison-container {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    .info-section {
+      background-color: #f9f9f9;
+      border-radius: 6px;
+      padding: 20px;
+    }
+
+    .info-section.old-info {
+      border: 2px solid #ffb74d;
+      background-color: #fff8e1;
+    }
+
+    .info-section.new-info {
+      border: 2px solid #66bb6a;
+      background-color: #e8f5e9;
+    }
+
+    .info-section h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+    }
+
+    .info-section.old-info h2 {
+      color: #ef6c00;
+      border-bottom: 2px solid #ffb74d;
+    }
+
+    .info-section.new-info h2 {
+      color: #2e7d32;
+      border-bottom: 2px solid #66bb6a;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .info-item {
+      display: flex;
+      align-items: flex-start;
+      padding: 10px;
+      background-color: #fff;
+      border-radius: 4px;
+    }
+
+    .info-section.old-info .info-item {
+      border-left: 3px solid #ffb74d;
+    }
+
+    .info-section.new-info .info-item {
+      border-left: 3px solid #66bb6a;
+    }
+
+    .info-item .icon {
+      font-size: 20px;
+      margin-right: 10px;
+      min-width: 24px;
+    }
+
+    .info-item .label {
+      font-weight: 600;
+      color: #555;
+      margin-right: 5px;
+    }
+
+    .info-item .value {
+      color: #333;
+    }
+
+    .highlight-box {
+      background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+      border: 2px solid #66bb6a;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .highlight-box h3 {
+      color: #2e7d32;
+      font-size: 18px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .highlight-box .date-time {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1b5e20;
+      margin: 10px 0;
+    }
+
+    .reason-box {
+      background-color: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    .reason-box h3 {
+      color: #856404;
+      font-size: 15px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .reason-box p {
+      color: #856404;
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .important-box {
+      background-color: #fff3e0;
+      border: 1px solid #ff9800;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    .important-box h3 {
+      color: #e65100;
+      font-size: 15px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .important-box ul {
+      margin: 10px 0 0 20px;
+      color: #e65100;
+    }
+
+    .important-box li {
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .contact-section {
+      background-color: #f5f5f5;
+      border-radius: 6px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+
+    .contact-section h3 {
+      color: #555;
+      font-size: 14px;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .contact-section p {
+      margin: 5px 0;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .footer {
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+    }
+
+    .footer p {
+      margin: 5px 0;
+    }
+
+    .footer a {
+      color: #2196f3;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media only screen and (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+
+      .content {
+        padding: 20px 15px;
+      }
+
+      .header h1 {
+        font-size: 20px;
+      }
+
+      .highlight-box .date-time {
+        font-size: 20px;
+      }
+
+      .comparison-container {
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🔄 Entrevista Reagendada</h1>
+      <p>Colegio Monte Tabor y Nazaret</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      {{#if isGuardian}}
+        <div class="greeting">
+          Estimado/a <strong>{{guardianName}}</strong>,
+        </div>
+
+        <div class="alert-box">
+          <p>La entrevista para su hijo/a <strong>{{studentName}}</strong> ha sido reagendada a una nueva fecha y hora.</p>
+        </div>
+
+        <!-- New Date/Time Highlight -->
+        <div class="highlight-box">
+          <h3>✨ Nueva Fecha y Hora</h3>
+          <div class="date-time">
+            📅 {{newScheduledDate}}
+          </div>
+          <div class="date-time">
+            🕐 {{newScheduledTime}} hrs
+          </div>
+        </div>
+
+        <!-- Comparison: Old vs New -->
+        <div class="comparison-container">
+          <!-- Previous Info -->
+          <div class="info-section old-info">
+            <h2>📋 Información Anterior</h2>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="icon">👤</span>
+                <div>
+                  <span class="label">Estudiante:</span>
+                  <span class="value">{{studentName}}</span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">📝</span>
+                <div>
+                  <span class="label">Tipo de Entrevista:</span>
+                  <span class="value">
+                    {{#if (eq interviewType 'FAMILY')}}Entrevista Familiar{{/if}}
+                    {{#if (eq interviewType 'CYCLE_DIRECTOR')}}Entrevista con Director de Ciclo{{/if}}
+                    {{#if (eq interviewType 'INDIVIDUAL')}}Entrevista Individual{{/if}}
+                  </span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">📅</span>
+                <div>
+                  <span class="label">Fecha:</span>
+                  <span class="value">{{oldScheduledDate}}</span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">🕐</span>
+                <div>
+                  <span class="label">Hora:</span>
+                  <span class="value">{{oldScheduledTime}} hrs</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- New Info -->
+          <div class="info-section new-info">
+            <h2>✅ Nueva Información</h2>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="icon">👤</span>
+                <div>
+                  <span class="label">Estudiante:</span>
+                  <span class="value">{{studentName}}</span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">📝</span>
+                <div>
+                  <span class="label">Tipo de Entrevista:</span>
+                  <span class="value">
+                    {{#if (eq interviewType 'FAMILY')}}Entrevista Familiar{{/if}}
+                    {{#if (eq interviewType 'CYCLE_DIRECTOR')}}Entrevista con Director de Ciclo{{/if}}
+                    {{#if (eq interviewType 'INDIVIDUAL')}}Entrevista Individual{{/if}}
+                  </span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">📅</span>
+                <div>
+                  <span class="label">Fecha:</span>
+                  <span class="value">{{newScheduledDate}}</span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">🕐</span>
+                <div>
+                  <span class="label">Hora:</span>
+                  <span class="value">{{newScheduledTime}} hrs</span>
+                </div>
+              </div>
+              {{#if interviewerName}}
+              <div class="info-item">
+                <span class="icon">👨‍🏫</span>
+                <div>
+                  <span class="label">Entrevistador(a):</span>
+                  <span class="value">{{interviewerName}}</span>
+                </div>
+              </div>
+              {{/if}}
+              {{#if secondInterviewerName}}
+              <div class="info-item">
+                <span class="icon">👩‍🏫</span>
+                <div>
+                  <span class="label">Segundo(a) Entrevistador(a):</span>
+                  <span class="value">{{secondInterviewerName}}</span>
+                </div>
+              </div>
+              {{/if}}
+            </div>
+          </div>
+        </div>
+
+        {{#if reason}}
+        <div class="reason-box">
+          <h3>📌 Motivo del Cambio</h3>
+          <p>{{reason}}</p>
+        </div>
+        {{/if}}
+
+        <div class="important-box">
+          <h3>⚠️ Información Importante</h3>
+          <ul>
+            <li>Por favor, llegue <strong>10 minutos antes</strong> de la hora programada</li>
+            <li>La entrevista tendrá una duración aproximada de <strong>{{duration}} minutos</strong></li>
+            <li>Traiga consigo los documentos solicitados previamente</li>
+            <li>Si tiene alguna duda o no puede asistir, contáctese con nosotros lo antes posible</li>
+          </ul>
+        </div>
+
+      {{else}}
+        <!-- Interviewer Version -->
+        <div class="greeting">
+          Estimado/a <strong>{{interviewerName}}</strong>,
+        </div>
+
+        <div class="alert-box">
+          <p>La entrevista con el/la estudiante <strong>{{studentName}}</strong> ha sido reagendada.</p>
+        </div>
+
+        <!-- New Date/Time Highlight -->
+        <div class="highlight-box">
+          <h3>✨ Nueva Fecha y Hora</h3>
+          <div class="date-time">
+            📅 {{newScheduledDate}}
+          </div>
+          <div class="date-time">
+            🕐 {{newScheduledTime}} hrs
+          </div>
+        </div>
+
+        <!-- Comparison: Old vs New -->
+        <div class="comparison-container">
+          <!-- Previous Info -->
+          <div class="info-section old-info">
+            <h2>📋 Información Anterior</h2>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="icon">👤</span>
+                <div>
+                  <span class="label">Estudiante:</span>
+                  <span class="value">{{studentName}}</span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">📝</span>
+                <div>
+                  <span class="label">Tipo de Entrevista:</span>
+                  <span class="value">
+                    {{#if (eq interviewType 'FAMILY')}}Entrevista Familiar{{/if}}
+                    {{#if (eq interviewType 'CYCLE_DIRECTOR')}}Entrevista con Director de Ciclo{{/if}}
+                    {{#if (eq interviewType 'INDIVIDUAL')}}Entrevista Individual{{/if}}
+                  </span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">📅</span>
+                <div>
+                  <span class="label">Fecha:</span>
+                  <span class="value">{{oldScheduledDate}}</span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">🕐</span>
+                <div>
+                  <span class="label">Hora:</span>
+                  <span class="value">{{oldScheduledTime}} hrs</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- New Info -->
+          <div class="info-section new-info">
+            <h2>✅ Nueva Información</h2>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="icon">👤</span>
+                <div>
+                  <span class="label">Estudiante:</span>
+                  <span class="value">{{studentName}}</span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">📝</span>
+                <div>
+                  <span class="label">Tipo de Entrevista:</span>
+                  <span class="value">
+                    {{#if (eq interviewType 'FAMILY')}}Entrevista Familiar{{/if}}
+                    {{#if (eq interviewType 'CYCLE_DIRECTOR')}}Entrevista con Director de Ciclo{{/if}}
+                    {{#if (eq interviewType 'INDIVIDUAL')}}Entrevista Individual{{/if}}
+                  </span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">📅</span>
+                <div>
+                  <span class="label">Fecha:</span>
+                  <span class="value">{{newScheduledDate}}</span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">🕐</span>
+                <div>
+                  <span class="label">Hora:</span>
+                  <span class="value">{{newScheduledTime}} hrs</span>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="icon">📍</span>
+                <div>
+                  <span class="label">Lugar:</span>
+                  <span class="value">{{location}}</span>
+                </div>
+              </div>
+              {{#if secondInterviewerName}}
+              <div class="info-item">
+                <span class="icon">👥</span>
+                <div>
+                  <span class="label">Entrevista Conjunta con:</span>
+                  <span class="value">{{secondInterviewerName}}</span>
+                </div>
+              </div>
+              {{/if}}
+            </div>
+          </div>
+        </div>
+
+        {{#if reason}}
+        <div class="reason-box">
+          <h3>📌 Motivo del Cambio</h3>
+          <p>{{reason}}</p>
+        </div>
+        {{/if}}
+
+        <div class="important-box">
+          <h3>⚠️ Recordatorio</h3>
+          <ul>
+            <li>Se ha liberado automáticamente su horario anterior</li>
+            <li>El nuevo horario ha sido bloqueado en su agenda</li>
+            <li>Duración estimada: <strong>{{duration}} minutos</strong></li>
+            <li>Si tiene algún inconveniente, por favor contáctese con coordinación lo antes posible</li>
+          </ul>
+        </div>
+      {{/if}}
+
+      <!-- Contact Section -->
+      <div class="contact-section">
+        <h3>📞 ¿Necesita Ayuda?</h3>
+        <p><strong>Teléfono:</strong> +56 2 1234 5678</p>
+        <p><strong>Email:</strong> admisiones@mtn.cl</p>
+        <p><strong>Horario de Atención:</strong> Lunes a Viernes, 9:00 - 17:00 hrs</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p><strong>Colegio Monte Tabor y Nazaret</strong></p>
+      <p>Este es un correo automático, por favor no responder.</p>
+      <p>© {{year}} Colegio Monte Tabor y Nazaret. Todos los derechos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>

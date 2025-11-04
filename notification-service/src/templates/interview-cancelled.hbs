@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrevista Cancelada - Colegio Monte Tabor y Nazaret</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f4f4f4;
+      padding: 20px;
+    }
+
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .header {
+      background: linear-gradient(135deg, #8B0000 0%, #B22222 100%);
+      color: white;
+      padding: 30px 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+
+    .header p {
+      font-size: 14px;
+      opacity: 0.95;
+    }
+
+    .content {
+      padding: 30px 20px;
+    }
+
+    .greeting {
+      font-size: 16px;
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .alert-box {
+      background-color: #fee;
+      border-left: 4px solid #d32f2f;
+      padding: 15px;
+      margin-bottom: 25px;
+      border-radius: 4px;
+    }
+
+    .alert-box p {
+      margin: 0;
+      color: #c62828;
+      font-weight: 500;
+      font-size: 15px;
+    }
+
+    .info-section {
+      background-color: #f9f9f9;
+      border-radius: 6px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .info-section h2 {
+      color: #8B0000;
+      font-size: 18px;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #B22222;
+      padding-bottom: 8px;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .info-item {
+      display: flex;
+      align-items: flex-start;
+      padding: 10px;
+      background-color: #fff;
+      border-radius: 4px;
+      border-left: 3px solid #8B0000;
+    }
+
+    .info-item .icon {
+      font-size: 20px;
+      margin-right: 10px;
+      min-width: 24px;
+    }
+
+    .info-item .label {
+      font-weight: 600;
+      color: #555;
+      margin-right: 5px;
+    }
+
+    .info-item .value {
+      color: #333;
+    }
+
+    .reason-box {
+      background-color: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    .reason-box h3 {
+      color: #856404;
+      font-size: 15px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .reason-box p {
+      color: #856404;
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .action-box {
+      background-color: #e3f2fd;
+      border: 1px solid #2196f3;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+    .action-box h3 {
+      color: #1565c0;
+      font-size: 15px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .action-box p {
+      color: #1565c0;
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .contact-section {
+      background-color: #f5f5f5;
+      border-radius: 6px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+
+    .contact-section h3 {
+      color: #555;
+      font-size: 14px;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .contact-section p {
+      margin: 5px 0;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .footer {
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+    }
+
+    .footer p {
+      margin: 5px 0;
+    }
+
+    .footer a {
+      color: #B22222;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media only screen and (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+
+      .content {
+        padding: 20px 15px;
+      }
+
+      .header h1 {
+        font-size: 20px;
+      }
+
+      .info-grid {
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <!-- Header -->
+    <div class="header">
+      <h1>⚠️ Entrevista Cancelada</h1>
+      <p>Colegio Monte Tabor y Nazaret</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      {{#if isGuardian}}
+        <div class="greeting">
+          Estimado/a <strong>{{guardianName}}</strong>,
+        </div>
+
+        <div class="alert-box">
+          <p>La entrevista programada para su hijo/a <strong>{{studentName}}</strong> ha sido cancelada.</p>
+        </div>
+
+        <div class="info-section">
+          <h2>📋 Detalles de la Entrevista Cancelada</h2>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="icon">👤</span>
+              <div>
+                <span class="label">Estudiante:</span>
+                <span class="value">{{studentName}}</span>
+              </div>
+            </div>
+            <div class="info-item">
+              <span class="icon">📝</span>
+              <div>
+                <span class="label">Tipo de Entrevista:</span>
+                <span class="value">
+                  {{#if (eq interviewType 'FAMILY')}}Entrevista Familiar{{/if}}
+                  {{#if (eq interviewType 'CYCLE_DIRECTOR')}}Entrevista con Director de Ciclo{{/if}}
+                  {{#if (eq interviewType 'INDIVIDUAL')}}Entrevista Individual{{/if}}
+                </span>
+              </div>
+            </div>
+            <div class="info-item">
+              <span class="icon">📅</span>
+              <div>
+                <span class="label">Fecha (Original):</span>
+                <span class="value">{{scheduledDate}}</span>
+              </div>
+            </div>
+            <div class="info-item">
+              <span class="icon">🕐</span>
+              <div>
+                <span class="label">Hora (Original):</span>
+                <span class="value">{{scheduledTime}} hrs</span>
+              </div>
+            </div>
+            {{#if interviewerName}}
+            <div class="info-item">
+              <span class="icon">👨‍🏫</span>
+              <div>
+                <span class="label">Entrevistador(a):</span>
+                <span class="value">{{interviewerName}}</span>
+              </div>
+            </div>
+            {{/if}}
+            {{#if secondInterviewerName}}
+            <div class="info-item">
+              <span class="icon">👩‍🏫</span>
+              <div>
+                <span class="label">Segundo(a) Entrevistador(a):</span>
+                <span class="value">{{secondInterviewerName}}</span>
+              </div>
+            </div>
+            {{/if}}
+          </div>
+        </div>
+
+        {{#if cancellationReason}}
+        <div class="reason-box">
+          <h3>📌 Motivo de la Cancelación</h3>
+          <p>{{cancellationReason}}</p>
+        </div>
+        {{/if}}
+
+        <div class="action-box">
+          <h3>🔄 Próximos Pasos</h3>
+          <p>
+            Si desea reprogramar la entrevista, por favor contáctese con el colegio a través de los medios indicados abajo.
+            Nuestro equipo estará encantado de encontrar un nuevo horario que se ajuste a su disponibilidad.
+          </p>
+        </div>
+
+      {{else}}
+        <!-- Interviewer Version -->
+        <div class="greeting">
+          Estimado/a <strong>{{interviewerName}}</strong>,
+        </div>
+
+        <div class="alert-box">
+          <p>La entrevista con el/la estudiante <strong>{{studentName}}</strong> ha sido cancelada.</p>
+        </div>
+
+        <div class="info-section">
+          <h2>📋 Detalles de la Entrevista Cancelada</h2>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="icon">👤</span>
+              <div>
+                <span class="label">Estudiante:</span>
+                <span class="value">{{studentName}}</span>
+              </div>
+            </div>
+            <div class="info-item">
+              <span class="icon">📝</span>
+              <div>
+                <span class="label">Tipo de Entrevista:</span>
+                <span class="value">
+                  {{#if (eq interviewType 'FAMILY')}}Entrevista Familiar{{/if}}
+                  {{#if (eq interviewType 'CYCLE_DIRECTOR')}}Entrevista con Director de Ciclo{{/if}}
+                  {{#if (eq interviewType 'INDIVIDUAL')}}Entrevista Individual{{/if}}
+                </span>
+              </div>
+            </div>
+            <div class="info-item">
+              <span class="icon">📅</span>
+              <div>
+                <span class="label">Fecha (Original):</span>
+                <span class="value">{{scheduledDate}}</span>
+              </div>
+            </div>
+            <div class="info-item">
+              <span class="icon">🕐</span>
+              <div>
+                <span class="label">Hora (Original):</span>
+                <span class="value">{{scheduledTime}} hrs</span>
+              </div>
+            </div>
+            {{#if secondInterviewerName}}
+            <div class="info-item">
+              <span class="icon">👥</span>
+              <div>
+                <span class="label">Entrevista Conjunta con:</span>
+                <span class="value">{{secondInterviewerName}}</span>
+              </div>
+            </div>
+            {{/if}}
+          </div>
+        </div>
+
+        {{#if cancellationReason}}
+        <div class="reason-box">
+          <h3>📌 Motivo de la Cancelación</h3>
+          <p>{{cancellationReason}}</p>
+        </div>
+        {{/if}}
+
+        <div class="action-box">
+          <h3>✅ Horario Liberado</h3>
+          <p>
+            Su horario para esta fecha ha sido liberado automáticamente y ahora está disponible para otras entrevistas.
+          </p>
+        </div>
+      {{/if}}
+
+      <!-- Contact Section -->
+      <div class="contact-section">
+        <h3>📞 ¿Necesita Ayuda?</h3>
+        <p><strong>Teléfono:</strong> +56 2 1234 5678</p>
+        <p><strong>Email:</strong> admisiones@mtn.cl</p>
+        <p><strong>Horario de Atención:</strong> Lunes a Viernes, 9:00 - 17:00 hrs</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p><strong>Colegio Monte Tabor y Nazaret</strong></p>
+      <p>Este es un correo automático, por favor no responder.</p>
+      <p>© {{year}} Colegio Monte Tabor y Nazaret. Todos los derechos reservados.</p>
+    </div>
+  </div>
+</body>
+</html>
