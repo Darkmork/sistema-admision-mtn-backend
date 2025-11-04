@@ -455,4 +455,22 @@ router.delete(
   InterviewController.deleteInterview.bind(InterviewController)
 );
 
+// PATCH /api/interviews/:id/cancel - Cancel an interview
+router.patch(
+  '/:id/cancel',
+  authenticate,
+  validateCsrf,
+  requireRole('ADMIN', 'COORDINATOR', 'CYCLE_DIRECTOR'),
+  InterviewController.cancelInterview.bind(InterviewController)
+);
+
+// PATCH /api/interviews/:id/reschedule - Reschedule an interview
+router.patch(
+  '/:id/reschedule',
+  authenticate,
+  validateCsrf,
+  requireRole('ADMIN', 'COORDINATOR', 'CYCLE_DIRECTOR'),
+  InterviewController.rescheduleInterview.bind(InterviewController)
+);
+
 module.exports = router;

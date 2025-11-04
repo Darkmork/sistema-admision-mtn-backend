@@ -339,6 +339,105 @@ class InterviewController {
     }
   }
 
+  /**
+   * PATCH /api/interviews/:id/cancel
+   * Cancel an interview
+   */
+  async cancelInterview(req, res) {
+    try {
+      const { id } = req.params;
+      const { cancellationReason } = req.body;
+      const cancelledBy = req.user?.id; // From authentication middleware
+
+      if (!cancelledBy) {
+        return res.status(401).json(fail('INT_018', 'User not authenticated'));
+      }
+
+      if (!cancellationReason || cancellationReason.trim() === '') {
+        return res.status(400).json(fail('INT_019', 'Cancellation reason is required'));
+      }
+
+      const interview = await InterviewService.cancelInterview(id, cancelledBy, cancellationReason);
+
+      // Invalidate cached interview lists
+      const invalidated = req.evaluationCache.invalidatePattern('interviews:*');
+      logger.info(`Cache invalidated after CANCEL: ${invalidated} entries`);
+
+      return res.json(ok({
+        message: 'Interview cancelled successfully',
+        interview: interview.toJSON()
+      }));
+    } catch (error) {
+      logger.error(`Error cancelling interview ${req.params.id}:`, error);
+
+      // Handle specific errors
+      if (error.message.includes('not found')) {
+        return res.status(404).json(fail('INT_020', 'Interview not found'));
+      }
+      if (error.message.includes('already cancelled')) {
+        return res.status(409).json(fail('INT_021', 'Interview is already cancelled'));
+      }
+      if (error.message.includes('Cannot cancel a completed interview')) {
+        return res.status(409).json(fail('INT_022', 'Cannot cancel a completed interview'));
+      }
+
+      return res.status(500).json(fail('INT_023', 'Failed to cancel interview', error.message));
+    }
+  }
+
+  /**
+   * PATCH /api/interviews/:id/reschedule
+   * Reschedule an interview to a new date/time
+   */
+  async rescheduleInterview(req, res) {
+    try {
+      const { id } = req.params;
+      const { newDate, newTime, reason } = req.body;
+      const rescheduledBy = req.user?.id; // From authentication middleware
+
+      if (!rescheduledBy) {
+        return res.status(401).json(fail('INT_024', 'User not authenticated'));
+      }
+
+      if (!newDate || !newTime) {
+        return res.status(400).json(fail('INT_025', 'New date and time are required'));
+      }
+
+      if (!reason || reason.trim() === '') {
+        return res.status(400).json(fail('INT_026', 'Reschedule reason is required'));
+      }
+
+      const interview = await InterviewService.rescheduleInterview(id, newDate, newTime, rescheduledBy, reason);
+
+      // Invalidate cached interview lists
+      const invalidated = req.evaluationCache.invalidatePattern('interviews:*');
+      logger.info(`Cache invalidated after RESCHEDULE: ${invalidated} entries`);
+
+      return res.json(ok({
+        message: 'Interview rescheduled successfully',
+        interview: interview.toJSON()
+      }));
+    } catch (error) {
+      logger.error(`Error rescheduling interview ${req.params.id}:`, error);
+
+      // Handle specific errors
+      if (error.message.includes('not found')) {
+        return res.status(404).json(fail('INT_027', 'Interview not found'));
+      }
+      if (error.message.includes('Cannot reschedule a cancelled interview')) {
+        return res.status(409).json(fail('INT_028', 'Cannot reschedule a cancelled interview'));
+      }
+      if (error.message.includes('Cannot reschedule a completed interview')) {
+        return res.status(409).json(fail('INT_029', 'Cannot reschedule a completed interview'));
+      }
+      if (error.message.includes('not available')) {
+        return res.status(409).json(fail('INT_030', 'Interviewer is not available at the requested time'));
+      }
+
+      return res.status(500).json(fail('INT_031', 'Failed to reschedule interview', error.message));
+    }
+  }
+
   // Send interview summary email to applicant and interviewers
   async sendInterviewSummary(req, res) {
     const axios = require('axios');

@@ -451,6 +451,483 @@ class InterviewService {
       return result.rows.length === 0;
     });
   }
+
+  /**
+   * Cancel an interview
+   * @param {number} interviewId - ID of the interview to cancel
+   * @param {number} cancelledBy - User ID of who is cancelling
+   * @param {string} cancellationReason - Reason for cancellation
+   * @returns {Promise<Interview>} - Cancelled interview
+   */
+  async cancelInterview(interviewId, cancelledBy, cancellationReason) {
+    return await writeOperationBreaker.fire(async () => {
+      // Verificar que la entrevista existe y no está ya cancelada
+      const checkResult = await dbPool.query(
+        'SELECT * FROM interviews WHERE id = $1',
+        [interviewId]
+      );
+
+      if (checkResult.rows.length === 0) {
+        throw new Error(`Interview ${interviewId} not found`);
+      }
+
+      const currentInterview = checkResult.rows[0];
+
+      if (currentInterview.status === 'CANCELLED') {
+        throw new Error(`Interview ${interviewId} is already cancelled`);
+      }
+
+      if (currentInterview.status === 'COMPLETED') {
+        throw new Error(`Cannot cancel a completed interview`);
+      }
+
+      // Actualizar la entrevista a CANCELLED
+      // El trigger automáticamente registrará el cambio en interview_history
+      const result = await dbPool.query(
+        `UPDATE interviews
+         SET status = 'CANCELLED',
+             cancelled_at = NOW(),
+             cancelled_by = $1,
+             cancellation_reason = $2,
+             updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [cancelledBy, cancellationReason, interviewId]
+      );
+
+      logger.info(`Interview ${interviewId} cancelled by user ${cancelledBy}. Reason: ${cancellationReason}`);
+
+      const cancelledInterview = Interview.fromDatabaseRow(result.rows[0]);
+
+      // Liberar horarios en interviewer_schedules (si existen)
+      try {
+        await this.releaseInterviewerSchedule(
+          currentInterview.interviewer_user_id,
+          currentInterview.scheduled_date,
+          currentInterview.scheduled_time
+        );
+
+        // Si hay segundo entrevistador, liberar su horario también
+        if (currentInterview.second_interviewer_id) {
+          await this.releaseInterviewerSchedule(
+            currentInterview.second_interviewer_id,
+            currentInterview.scheduled_date,
+            currentInterview.scheduled_time
+          );
+        }
+      } catch (scheduleError) {
+        logger.error(`Error releasing interviewer schedules for interview ${interviewId}:`, scheduleError);
+        // No fallar la cancelación si no se pueden liberar los horarios
+      }
+
+      // Enviar notificaciones (sin bloquear la respuesta)
+      this.sendCancellationNotifications(cancelledInterview, currentInterview, cancellationReason).catch(err => {
+        logger.error(`Error sending cancellation notifications for interview ${interviewId}:`, err);
+      });
+
+      return cancelledInterview;
+    });
+  }
+
+  /**
+   * Reschedule an interview to a new date/time
+   * @param {number} interviewId - ID of the interview to reschedule
+   * @param {string} newDate - New date (YYYY-MM-DD)
+   * @param {string} newTime - New time (HH:MM:SS)
+   * @param {number} rescheduledBy - User ID of who is rescheduling
+   * @param {string} reason - Reason for rescheduling
+   * @returns {Promise<Interview>} - Rescheduled interview
+   */
+  async rescheduleInterview(interviewId, newDate, newTime, rescheduledBy, reason) {
+    return await writeOperationBreaker.fire(async () => {
+      // Verificar que la entrevista existe y puede ser reagendada
+      const checkResult = await dbPool.query(
+        'SELECT * FROM interviews WHERE id = $1',
+        [interviewId]
+      );
+
+      if (checkResult.rows.length === 0) {
+        throw new Error(`Interview ${interviewId} not found`);
+      }
+
+      const currentInterview = checkResult.rows[0];
+
+      if (currentInterview.status === 'CANCELLED') {
+        throw new Error(`Cannot reschedule a cancelled interview`);
+      }
+
+      if (currentInterview.status === 'COMPLETED') {
+        throw new Error(`Cannot reschedule a completed interview`);
+      }
+
+      // Verificar disponibilidad del entrevistador en la nueva fecha/hora
+      const isAvailable = await this.checkInterviewerAvailability(
+        currentInterview.interviewer_user_id,
+        newDate,
+        newTime,
+        currentInterview.duration || 60
+      );
+
+      if (!isAvailable) {
+        throw new Error(`Interviewer is not available at ${newDate} ${newTime}`);
+      }
+
+      // Si hay segundo entrevistador, verificar su disponibilidad también
+      if (currentInterview.second_interviewer_id) {
+        const isSecondAvailable = await this.checkInterviewerAvailability(
+          currentInterview.second_interviewer_id,
+          newDate,
+          newTime,
+          currentInterview.duration || 60
+        );
+
+        if (!isSecondAvailable) {
+          throw new Error(`Second interviewer is not available at ${newDate} ${newTime}`);
+        }
+      }
+
+      // Actualizar la entrevista con nueva fecha/hora y status RESCHEDULED
+      // El trigger automáticamente registrará el cambio en interview_history
+      const result = await dbPool.query(
+        `UPDATE interviews
+         SET scheduled_date = $1,
+             scheduled_time = $2,
+             status = 'RESCHEDULED',
+             updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [newDate, newTime, interviewId]
+      );
+
+      logger.info(`Interview ${interviewId} rescheduled to ${newDate} ${newTime} by user ${rescheduledBy}. Reason: ${reason}`);
+
+      const rescheduledInterview = Interview.fromDatabaseRow(result.rows[0]);
+
+      // Liberar horarios antiguos en interviewer_schedules
+      try {
+        await this.releaseInterviewerSchedule(
+          currentInterview.interviewer_user_id,
+          currentInterview.scheduled_date,
+          currentInterview.scheduled_time
+        );
+
+        if (currentInterview.second_interviewer_id) {
+          await this.releaseInterviewerSchedule(
+            currentInterview.second_interviewer_id,
+            currentInterview.scheduled_date,
+            currentInterview.scheduled_time
+          );
+        }
+      } catch (scheduleError) {
+        logger.error(`Error releasing old interviewer schedules for interview ${interviewId}:`, scheduleError);
+      }
+
+      // Enviar notificaciones (sin bloquear la respuesta)
+      this.sendRescheduleNotifications(rescheduledInterview, currentInterview, reason).catch(err => {
+        logger.error(`Error sending reschedule notifications for interview ${interviewId}:`, err);
+      });
+
+      return rescheduledInterview;
+    });
+  }
+
+  /**
+   * Release interviewer schedule slot
+   * @param {number} interviewerId - Interviewer user ID
+   * @param {string} date - Date (YYYY-MM-DD)
+   * @param {string} time - Time (HH:MM:SS)
+   */
+  async releaseInterviewerSchedule(interviewerId, date, time) {
+    try {
+      // Marcar el horario como disponible nuevamente (is_booked = false)
+      const result = await dbPool.query(
+        `UPDATE interviewer_schedules
+         SET is_booked = false,
+             updated_at = NOW()
+         WHERE interviewer_id = $1
+         AND schedule_date = $2
+         AND start_time = $3
+         RETURNING *`,
+        [interviewerId, date, time]
+      );
+
+      if (result.rows.length > 0) {
+        logger.info(`Released interviewer schedule for interviewer ${interviewerId} on ${date} at ${time}`);
+      } else {
+        logger.warn(`No interviewer schedule found to release for interviewer ${interviewerId} on ${date} at ${time}`);
+      }
+    } catch (error) {
+      logger.error(`Error releasing interviewer schedule:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send cancellation notifications
+   * @param {Interview} cancelledInterview - The cancelled interview
+   * @param {Object} originalInterviewData - Original interview data from DB
+   * @param {string} cancellationReason - Reason for cancellation
+   */
+  async sendCancellationNotifications(cancelledInterview, originalInterviewData, cancellationReason) {
+    const axios = require('axios');
+
+    try {
+      logger.info(`Sending cancellation notifications for interview ${cancelledInterview.id}`);
+
+      // 1. Obtener información de la aplicación, estudiante y apoderado
+      const appResult = await dbPool.query(`
+        SELECT
+          a.id as application_id,
+          s.id as student_id,
+          s.first_name as student_first_name,
+          s.paternal_last_name as student_paternal_last_name,
+          s.maternal_last_name as student_maternal_last_name,
+          g.id as guardian_id,
+          g.email as guardian_email,
+          g.first_name as guardian_first_name,
+          g.last_name as guardian_last_name
+        FROM applications a
+        JOIN students s ON a.student_id = s.id
+        LEFT JOIN guardians g ON a.guardian_id = g.id
+        WHERE a.id = $1
+      `, [cancelledInterview.applicationId]);
+
+      if (appResult.rows.length === 0) {
+        logger.warn(`Application ${cancelledInterview.applicationId} not found for interview ${cancelledInterview.id}`);
+        return;
+      }
+
+      const appData = appResult.rows[0];
+      const studentName = `${appData.student_first_name} ${appData.student_paternal_last_name} ${appData.student_maternal_last_name || ''}`.trim();
+
+      // 2. Obtener información de los entrevistadores
+      const interviewerIds = [originalInterviewData.interviewer_user_id];
+      if (originalInterviewData.second_interviewer_id) {
+        interviewerIds.push(originalInterviewData.second_interviewer_id);
+      }
+
+      const interviewersResult = await dbPool.query(`
+        SELECT id, email, first_name, last_name
+        FROM users
+        WHERE id = ANY($1)
+      `, [interviewerIds]);
+
+      const interviewers = interviewersResult.rows;
+
+      // 3. Preparar datos para el email
+      const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085';
+
+      const interviewTypeLabels = {
+        'FAMILY': 'Entrevista Familiar',
+        'CYCLE_DIRECTOR': 'Entrevista Director de Ciclo',
+        'INDIVIDUAL': 'Entrevista Psicológica'
+      };
+
+      const emailData = {
+        studentName,
+        interviewTypeLabel: interviewTypeLabels[originalInterviewData.interview_type] || originalInterviewData.interview_type,
+        originalDate: new Date(originalInterviewData.scheduled_date).toLocaleDateString('es-CL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        originalTime: originalInterviewData.scheduled_time ? originalInterviewData.scheduled_time.substring(0, 5) : 'No especificada',
+        cancellationReason,
+        year: new Date().getFullYear(),
+        portalUrl: process.env.PORTAL_URL || 'https://admision.mtn.cl'
+      };
+
+      // 4. Enviar email al apoderado
+      if (appData.guardian_email) {
+        try {
+          await axios.post(
+            `${notificationServiceUrl}/api/notifications/email`,
+            {
+              to: appData.guardian_email,
+              subject: `Entrevista Cancelada - ${studentName}`,
+              template: 'interview-cancelled',
+              data: {
+                ...emailData,
+                recipientName: `${appData.guardian_first_name} ${appData.guardian_last_name}`.trim()
+              }
+            },
+            { timeout: 10000 }
+          );
+          logger.info(`Cancellation email sent to guardian ${appData.guardian_email} for interview ${cancelledInterview.id}`);
+        } catch (error) {
+          logger.error(`Failed to send cancellation email to guardian:`, error.message);
+        }
+      }
+
+      // 5. Enviar email a los entrevistadores
+      for (const interviewer of interviewers) {
+        if (interviewer.email) {
+          try {
+            await axios.post(
+              `${notificationServiceUrl}/api/notifications/email`,
+              {
+                to: interviewer.email,
+                subject: `Entrevista Cancelada - ${studentName}`,
+                template: 'interview-cancelled',
+                data: {
+                  ...emailData,
+                  recipientName: `${interviewer.first_name} ${interviewer.last_name}`
+                }
+              },
+              { timeout: 10000 }
+            );
+            logger.info(`Cancellation email sent to interviewer ${interviewer.email} for interview ${cancelledInterview.id}`);
+          } catch (error) {
+            logger.error(`Failed to send cancellation email to interviewer ${interviewer.email}:`, error.message);
+          }
+        }
+      }
+
+      logger.info(`All cancellation notifications sent for interview ${cancelledInterview.id}`);
+    } catch (error) {
+      logger.error(`Error in sendCancellationNotifications for interview ${cancelledInterview.id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send reschedule notifications
+   * @param {Interview} rescheduledInterview - The rescheduled interview
+   * @param {Object} originalInterviewData - Original interview data from DB
+   * @param {string} reason - Reason for rescheduling
+   */
+  async sendRescheduleNotifications(rescheduledInterview, originalInterviewData, reason) {
+    const axios = require('axios');
+
+    try {
+      logger.info(`Sending reschedule notifications for interview ${rescheduledInterview.id}`);
+
+      // 1. Obtener información de la aplicación, estudiante y apoderado
+      const appResult = await dbPool.query(`
+        SELECT
+          a.id as application_id,
+          s.id as student_id,
+          s.first_name as student_first_name,
+          s.paternal_last_name as student_paternal_last_name,
+          s.maternal_last_name as student_maternal_last_name,
+          g.id as guardian_id,
+          g.email as guardian_email,
+          g.first_name as guardian_first_name,
+          g.last_name as guardian_last_name
+        FROM applications a
+        JOIN students s ON a.student_id = s.id
+        LEFT JOIN guardians g ON a.guardian_id = g.id
+        WHERE a.id = $1
+      `, [rescheduledInterview.applicationId]);
+
+      if (appResult.rows.length === 0) {
+        logger.warn(`Application ${rescheduledInterview.applicationId} not found for interview ${rescheduledInterview.id}`);
+        return;
+      }
+
+      const appData = appResult.rows[0];
+      const studentName = `${appData.student_first_name} ${appData.student_paternal_last_name} ${appData.student_maternal_last_name || ''}`.trim();
+
+      // 2. Obtener información de los entrevistadores
+      const interviewerIds = [originalInterviewData.interviewer_user_id];
+      if (originalInterviewData.second_interviewer_id) {
+        interviewerIds.push(originalInterviewData.second_interviewer_id);
+      }
+
+      const interviewersResult = await dbPool.query(`
+        SELECT id, email, first_name, last_name
+        FROM users
+        WHERE id = ANY($1)
+      `, [interviewerIds]);
+
+      const interviewers = interviewersResult.rows;
+
+      // 3. Preparar datos para el email
+      const notificationServiceUrl = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:8085';
+
+      const interviewTypeLabels = {
+        'FAMILY': 'Entrevista Familiar',
+        'CYCLE_DIRECTOR': 'Entrevista Director de Ciclo',
+        'INDIVIDUAL': 'Entrevista Psicológica'
+      };
+
+      const emailData = {
+        studentName,
+        interviewTypeLabel: interviewTypeLabels[originalInterviewData.interview_type] || originalInterviewData.interview_type,
+        originalDate: new Date(originalInterviewData.scheduled_date).toLocaleDateString('es-CL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        originalTime: originalInterviewData.scheduled_time ? originalInterviewData.scheduled_time.substring(0, 5) : 'No especificada',
+        newDate: new Date(rescheduledInterview.scheduledDate).toLocaleDateString('es-CL', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        newTime: rescheduledInterview.scheduledTime ? rescheduledInterview.scheduledTime.substring(0, 5) : 'No especificada',
+        rescheduleReason: reason,
+        location: originalInterviewData.location || 'Por confirmar',
+        duration: originalInterviewData.duration || 60,
+        year: new Date().getFullYear(),
+        portalUrl: process.env.PORTAL_URL || 'https://admision.mtn.cl'
+      };
+
+      // 4. Enviar email al apoderado
+      if (appData.guardian_email) {
+        try {
+          await axios.post(
+            `${notificationServiceUrl}/api/notifications/email`,
+            {
+              to: appData.guardian_email,
+              subject: `Entrevista Reagendada - ${studentName}`,
+              template: 'interview-rescheduled',
+              data: {
+                ...emailData,
+                recipientName: `${appData.guardian_first_name} ${appData.guardian_last_name}`.trim()
+              }
+            },
+            { timeout: 10000 }
+          );
+          logger.info(`Reschedule email sent to guardian ${appData.guardian_email} for interview ${rescheduledInterview.id}`);
+        } catch (error) {
+          logger.error(`Failed to send reschedule email to guardian:`, error.message);
+        }
+      }
+
+      // 5. Enviar email a los entrevistadores
+      for (const interviewer of interviewers) {
+        if (interviewer.email) {
+          try {
+            await axios.post(
+              `${notificationServiceUrl}/api/notifications/email`,
+              {
+                to: interviewer.email,
+                subject: `Entrevista Reagendada - ${studentName}`,
+                template: 'interview-rescheduled',
+                data: {
+                  ...emailData,
+                  recipientName: `${interviewer.first_name} ${interviewer.last_name}`
+                }
+              },
+              { timeout: 10000 }
+            );
+            logger.info(`Reschedule email sent to interviewer ${interviewer.email} for interview ${rescheduledInterview.id}`);
+          } catch (error) {
+            logger.error(`Failed to send reschedule email to interviewer ${interviewer.email}:`, error.message);
+          }
+        }
+      }
+
+      logger.info(`All reschedule notifications sent for interview ${rescheduledInterview.id}`);
+    } catch (error) {
+      logger.error(`Error in sendRescheduleNotifications for interview ${rescheduledInterview.id}:`, error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new InterviewService();
