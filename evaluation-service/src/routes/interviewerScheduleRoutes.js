@@ -100,7 +100,7 @@ router.get('/interviewer/:interviewerId/year/:year', authenticate, async (req, r
 
 // POST /api/interviewer-schedules - Create a new schedule
 // Invalidates interviewer cache since schedule count changes
-router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'INTERVIEWER'), async (req, res) => {
+router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'INTERVIEWER', 'TEACHER', 'CYCLE_DIRECTOR'), async (req, res) => {
   try {
     const { interviewer, dayOfWeek, startTime, endTime, year, specificDate, scheduleType, notes } = req.body;
     const interviewerId = interviewer?.id || interviewer;
@@ -172,7 +172,7 @@ router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR',
 });
 
 // POST /api/interviewer-schedules/interviewer/:interviewerId/recurring/:year - Create recurring schedules
-router.post('/interviewer/:interviewerId/recurring/:year', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'INTERVIEWER'), async (req, res) => {
+router.post('/interviewer/:interviewerId/recurring/:year', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'INTERVIEWER', 'TEACHER', 'CYCLE_DIRECTOR'), async (req, res) => {
   try {
     const { interviewerId, year } = req.params;
     const schedules = req.body;
@@ -577,7 +577,7 @@ router.post('/toggle', authenticate, validateCsrf, requireRole('ADMIN', 'COORDIN
 
 // POST /api/interviewer-schedules/toggle-bulk - Toggle slots in 30-min intervals for a time range
 // Crea si no existe, desactiva si existe. Procesa en transacción.
-router.post('/toggle-bulk', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+router.post('/toggle-bulk', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR', 'TEACHER', 'CYCLE_DIRECTOR'), async (req, res) => {
   const client = await dbPool.connect();
   try {
     const { interviewer, specificDate, startTime, endTime, year, notes } = req.body;
