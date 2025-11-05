@@ -111,7 +111,7 @@ class EvaluationController {
   async getMyEvaluations(req, res) {
     try {
       const evaluatorId = req.user.userId;
-      const { page: pageNum = 0, limit = 10, status, evaluationType } = req.query;
+      const { page: pageNum = 0, limit = 1000, status, evaluationType } = req.query;
 
       const filters = {
         ...(status && { status }),
