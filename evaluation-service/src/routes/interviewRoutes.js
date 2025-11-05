@@ -458,7 +458,6 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  validateCsrf,
   requireRole('ADMIN'),
   InterviewController.deleteInterview.bind(InterviewController)
 );
