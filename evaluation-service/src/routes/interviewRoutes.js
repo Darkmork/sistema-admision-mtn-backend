@@ -403,7 +403,10 @@ router.get('/available-slots', authenticate, async (req, res) => {
           });
         }
 
-        currentMinutes += durationMinutes;
+        // FIXED: Always increment by 30 minutes to generate slots every half-hour
+        // regardless of interview duration. This ensures :00 and :30 slots are always available.
+        // Previous bug: incremented by durationMinutes (60), which only generated hourly slots.
+        currentMinutes += 30;
       }
     }
 
