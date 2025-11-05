@@ -467,7 +467,6 @@ router.delete(
 router.patch(
   '/:id/cancel',
   authenticate,
-  validateCsrf,
   requireRole('ADMIN', 'COORDINATOR', 'CYCLE_DIRECTOR'),
   InterviewController.cancelInterview.bind(InterviewController)
 );
