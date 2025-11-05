@@ -378,12 +378,18 @@ router.get('/available-slots', authenticate, async (req, res) => {
       let currentMinutes = startHour * 60 + startMinute;
       const endMinutes = endHour * 60 + endMinute;
 
-      while (currentMinutes + durationMinutes <= endMinutes) {
+      // SOLUTION #1: Generate ALL slots every 30 minutes, regardless of duration
+      // This ensures we always see :00 and :30 slots, even when duration=60
+      while (currentMinutes < endMinutes) {
         const slotHour = Math.floor(currentMinutes / 60);
         const slotMinute = currentMinutes % 60;
         const slotTime = `${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}:00`;
 
+        // Check if this slot has enough space for the requested duration
+        const canFitDuration = (currentMinutes + durationMinutes <= endMinutes);
+
         // Check if this slot conflicts with existing interviews
+        // We check conflicts for the requested duration, but still include the slot
         const hasConflict = interviewsResult.rows.some(interview => {
           const [intHour, intMinute] = interview.scheduled_time.split(':').map(Number);
           const intStartMinutes = intHour * 60 + intMinute;
@@ -399,13 +405,12 @@ router.get('/available-slots', authenticate, async (req, res) => {
         if (!hasConflict) {
           availableSlots.push({
             time: slotTime,
-            display: `${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}`
+            display: `${String(slotHour).padStart(2, '0')}:${String(slotMinute).padStart(2, '0')}`,
+            canFitDuration: canFitDuration  // NEW: Indicates if slot fits requested duration
           });
         }
 
-        // FIXED: Always increment by 30 minutes to generate slots every half-hour
-        // regardless of interview duration. This ensures :00 and :30 slots are always available.
-        // Previous bug: incremented by durationMinutes (60), which only generated hourly slots.
+        // Always increment by 30 minutes to generate all possible half-hour slots
         currentMinutes += 30;
       }
     }
