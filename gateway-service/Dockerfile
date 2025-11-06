@@ -1,31 +1,47 @@
-# Express API Gateway Docker Image
-FROM node:18-alpine
+# Multi-stage build for Gateway Service
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Stage 1: Builder
+FROM node:18-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install --production
+# Install dependencies (prefer lockfile, fallback without it)
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 
-# Copy application code
-COPY . .
+# Stage 2: Production
+FROM node:18-alpine
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init curl
+
+# Create app user
+RUN addgroup -g 1001 nodejs && \
+    adduser -S -u 1001 -G nodejs nodejs
+
+WORKDIR /app
+
+# Copy application files first
+COPY --chown=nodejs:nodejs . .
+
+# Ensure no stale node_modules from context
+RUN rm -rf node_modules
+
+# Copy dependencies from builder
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+
+# Create directories
+RUN mkdir -p logs && \
+    chown -R nodejs:nodejs logs
 
 # Switch to non-root user
 USER nodejs
 
-# Expose port (Railway will assign dynamically via $PORT)
+# Expose port
 EXPOSE 8080
 
-# Start application
+# Start with dumb-init
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "src/server.js"]
