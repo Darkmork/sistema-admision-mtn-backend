@@ -1,4 +1,6 @@
 [build]
 builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+watchPaths = ["**"]
 [service]
 internal_port = 8080
