@@ -242,6 +242,23 @@ class InterviewController {
       const invalidated = req.evaluationCache.invalidatePattern('interviews:*');
       logger.info(`Cache invalidated after DELETE: ${invalidated} entries`);
 
+      // Invalidate dashboard-service cache (cross-service cache invalidation)
+      try {
+        const dashboardServiceUrl = process.env.DASHBOARD_SERVICE_URL || 'http://localhost:8086';
+        const axios = require('axios');
+
+        await axios.post(`${dashboardServiceUrl}/api/dashboard/cache/clear`, {
+          pattern: 'dashboard:*'
+        }, {
+          timeout: 3000  // 3 second timeout
+        });
+
+        logger.info(`Dashboard service cache invalidated after interview deletion (ID: ${id})`);
+      } catch (dashboardError) {
+        // Don't fail the request if dashboard cache invalidation fails
+        logger.warn(`Failed to invalidate dashboard cache after interview deletion:`, dashboardError.message);
+      }
+
       return res.json(ok({ message: 'Interview deleted successfully', interview: interview.toJSON() }));
     } catch (error) {
       logger.error(`Error deleting interview ${req.params.id}:`, error);
