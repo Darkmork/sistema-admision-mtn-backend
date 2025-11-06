@@ -645,6 +645,25 @@ tail -f gateway-service/logs/error.log
 - Check NGINX error logs
 - Verify upstream configuration in `nginx.conf`
 
+**Dashboard/Frontend only showing 10 items when more exist**:
+- **Symptoms**: Professor dashboard shows 10 evaluations when 20+ are assigned, or any listing shows partial data
+- **Root Cause**: Backend controller default `limit` parameter set to 10 (pagination limit)
+- **Solution**: Change default `limit` from 10 to 1000 in controller methods
+- **Files to check**:
+  - Backend controllers: `<service>/src/controllers/*Controller.js`
+  - Look for query parameter destructuring: `const { page, limit = 10 } = req.query;`
+  - Frontend: Remove `.slice()` calls that limit displayed items
+- **Example fix** (EvaluationController.js:114):
+```javascript
+// BEFORE:
+const { page: pageNum = 0, limit = 10, status, evaluationType } = req.query;
+
+// AFTER:
+const { page: pageNum = 0, limit = 1000, status, evaluationType } = req.query;
+```
+- **Testing**: After deploying, verify the affected dashboard loads all expected items
+- **Note**: This pattern was used successfully in AdminDashboard and ProfessorDashboard
+
 ## Key Technical Decisions
 
 1. **Microservices over Monolith**: Enables independent scaling, deployment, and team ownership

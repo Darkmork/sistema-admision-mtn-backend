@@ -101,6 +101,26 @@ class DashboardController {
       return res.status(500).json(fail('DASH_007', 'Failed to retrieve cache statistics', error.message));
     }
   }
+
+  /**
+   * GET /api/dashboard/applicants/:id/summary
+   * Get comprehensive summary for a specific applicant
+   */
+  async getApplicantSummary(req, res) {
+    try {
+      const { id } = req.params;
+      const summary = await DashboardService.getApplicantSummary(parseInt(id));
+
+      if (!summary) {
+        return res.status(404).json(fail('DASH_008', `Applicant with ID ${id} not found`));
+      }
+
+      return res.json(ok(summary));
+    } catch (error) {
+      logger.error(`Error getting applicant summary for ID ${req.params.id}:`, error);
+      return res.status(500).json(fail('DASH_009', 'Failed to retrieve applicant summary', error.message));
+    }
+  }
 }
 
 module.exports = new DashboardController();

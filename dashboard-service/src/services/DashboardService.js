@@ -573,6 +573,140 @@ class DashboardService {
       };
     });
   }
+
+  /**
+   * Get comprehensive summary for a specific applicant
+   * Returns normalized exam scores (0-100), family interview data, and cycle director decision
+   * @param {number} applicationId - Application ID
+   * @returns {object} Applicant summary with scores, interviews, and decision
+   */
+  async getApplicantSummary(applicationId) {
+    const cacheKey = `dashboard:applicant-summary:${applicationId}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      logger.info(`[Cache HIT] applicant-summary:${applicationId}`);
+      return cached;
+    }
+    logger.info(`[Cache MISS] applicant-summary:${applicationId}`);
+
+    return await mediumQueryBreaker.fire(async () => {
+      // Get basic applicant data
+      const applicantQuery = await dbPool.query(
+        `SELECT
+          a.id as application_id,
+          s.first_name || ' ' || s.paternal_last_name || ' ' || COALESCE(s.maternal_last_name, '') as student_name,
+          s.grade_applied as grade_applied,
+          a.status as application_status
+        FROM applications a
+        INNER JOIN students s ON s.id = a.student_id
+        WHERE a.id = $1 AND a.deleted_at IS NULL`,
+        [applicationId]
+      );
+
+      if (applicantQuery.rows.length === 0) {
+        return null; // Application not found
+      }
+
+      const applicant = applicantQuery.rows[0];
+
+      // Get evaluation scores (normalized to 0-100)
+      const scoresQuery = await dbPool.query(
+        `SELECT
+          evaluation_type,
+          score,
+          max_score,
+          status
+        FROM evaluations
+        WHERE application_id = $1
+          AND evaluation_type IN ('LANGUAGE_EXAM', 'ENGLISH_EXAM', 'MATHEMATICS_EXAM')
+          AND status = 'COMPLETED'`,
+        [applicationId]
+      );
+
+      // Normalize scores to 0-100
+      const scores = {
+        languagePct: null,
+        englishPct: null,
+        mathPct: null
+      };
+
+      scoresQuery.rows.forEach(row => {
+        if (row.score !== null && row.max_score && row.max_score > 0) {
+          const percentage = Math.round((row.score / row.max_score) * 100 * 10) / 10; // Round to 1 decimal
+
+          if (row.evaluation_type === 'LANGUAGE_EXAM') {
+            scores.languagePct = percentage;
+          } else if (row.evaluation_type === 'ENGLISH_EXAM') {
+            scores.englishPct = percentage;
+          } else if (row.evaluation_type === 'MATHEMATICS_EXAM') {
+            scores.mathPct = percentage;
+          }
+        }
+      });
+
+      // Get family interview data
+      const interviewQuery = await dbPool.query(
+        `SELECT
+          AVG(score) as avg_score,
+          COUNT(*) as count
+        FROM interviews
+        WHERE application_id = $1
+          AND interview_type = 'FAMILY'
+          AND status = 'COMPLETED'
+          AND score IS NOT NULL`,
+        [applicationId]
+      );
+
+      const familyInterview = {
+        avgScore: interviewQuery.rows[0].avg_score
+          ? Math.round(parseFloat(interviewQuery.rows[0].avg_score) * 10) / 10
+          : null,
+        count: parseInt(interviewQuery.rows[0].count) || 0
+      };
+
+      // Get cycle director decision (latest)
+      const decisionQuery = await dbPool.query(
+        `SELECT
+          decision,
+          decision_date,
+          highlights,
+          comment
+        FROM cycle_director_decisions
+        WHERE application_id = $1
+        ORDER BY decision_date DESC
+        LIMIT 1`,
+        [applicationId]
+      );
+
+      const cycleDirectorDecision = decisionQuery.rows.length > 0 ? {
+        decision: decisionQuery.rows[0].decision || 'PENDIENTE',
+        decisionDate: decisionQuery.rows[0].decision_date || null,
+        highlights: decisionQuery.rows[0].highlights || '',
+        rawComment: decisionQuery.rows[0].comment || ''
+      } : {
+        decision: 'PENDIENTE',
+        decisionDate: null,
+        highlights: '',
+        rawComment: ''
+      };
+
+      const summary = {
+        applicantId: parseInt(applicant.application_id),
+        studentName: applicant.student_name.trim(),
+        gradeApplied: applicant.grade_applied || 'No especificado',
+        applicationStatus: applicant.application_status,
+        scores,
+        familyInterview,
+        cycleDirectorDecision
+      };
+
+      // Cache for 60 seconds
+      cache.set(cacheKey, summary, 60000);
+      logger.info(`Retrieved applicant summary for application ${applicationId}`);
+
+      return summary;
+    });
+  }
 }
 
 module.exports = new DashboardService();

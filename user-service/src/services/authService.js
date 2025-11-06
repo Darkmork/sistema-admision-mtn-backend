@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 // BCrypt rounds optimized for Railway shared vCPU
 const BCRYPT_ROUNDS = 8;
@@ -69,6 +70,26 @@ class AuthService {
 
       // Create JWT token
       const token = this.createJWT(user);
+
+      // Hash the token with SHA-256 for storage
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+      // Get user agent and IP address from request (if available)
+      const userAgent = null; // Will be set from req.headers in controller
+      const ipAddress = null; // Will be set from req.ip in controller
+
+      // Invalidate all existing sessions for this user
+      await client.query(
+        'DELETE FROM active_sessions WHERE user_id = $1',
+        [user.id]
+      );
+
+      // Create new session
+      await client.query(
+        `INSERT INTO active_sessions (user_id, token_hash, created_at, last_activity, user_agent, ip_address)
+         VALUES ($1, $2, NOW(), NOW(), $3, $4)`,
+        [user.id, tokenHash, userAgent, ipAddress]
+      );
 
       const responseData = {
         success: true,

@@ -93,6 +93,18 @@ router.get(
 );
 
 /**
+ * @route   GET /api/dashboard/applicants/:id/summary
+ * @desc    Get comprehensive summary for a specific applicant
+ * @access  Private (ADMIN, COORDINATOR)
+ */
+router.get(
+  '/applicants/:id/summary',
+  authenticate,
+  requireRole('ADMIN', 'COORDINATOR'),
+  DashboardController.getApplicantSummary
+);
+
+/**
  * @route   GET /api/dashboard/admin/detailed-stats
  * @desc    Get comprehensive detailed admin statistics with academic year filter
  * @access  Private (ADMIN, COORDINATOR)
