@@ -2094,3 +2094,421 @@ git commit -m "fix(user): resolve login timeout issue"
 git push origin hotfix/fix-login-bug
 # Create Pull Request to main AND develop
 ```
+
+## Database Schema Reference
+
+**CRITICAL**: This section documents the ACTUAL database schema from the production Railway PostgreSQL database. Always refer to this schema when writing SQL queries to ensure correct column names, types, and constraints.
+
+**Last Updated**: 2025-11-08 (Retrieved from Railway PostgreSQL)
+
+### Connection Information
+
+**Railway PostgreSQL Database:**
+- **Database**: `railway`
+- **Host**: `shortline.proxy.rlwy.net`
+- **Port**: `51802`
+- **User**: `postgres`
+
+**Connection String**:
+```bash
+PGPASSWORD=ZpCiUAdcTCHnZjDFKegbsdfrsfihSqoo psql -h shortline.proxy.rlwy.net -U postgres -p 51802 -d railway
+```
+
+**IMPORTANT**: Never hardcode credentials in source code. Use environment variables in production.
+
+### Core Tables
+
+#### students
+
+```sql
+Table "public.students"
+        Column        |              Type              | Constraints
+----------------------+--------------------------------+-------------
+ id                   | bigint                         | PK (IDENTITY)
+ first_name           | character varying(255)         | NOT NULL
+ paternal_last_name   | character varying(255)         | NOT NULL
+ maternal_last_name   | character varying(255)         | NOT NULL
+ birth_date           | date                           | NOT NULL
+ rut                  | character varying(255)         | UNIQUE
+ email                | character varying(255)         | 
+ address              | character varying(255)         | NOT NULL
+ grade_applied        | character varying(255)         | NOT NULL
+ current_school       | character varying(255)         | 
+ school_applied       | character varying(255)         | 
+ age                  | integer                        | 
+ nationality          | character varying(20)          | DEFAULT 'CHILENA'
+ passport             | character varying(50)          | 
+ is_employee_child    | boolean                        | DEFAULT false
+ is_alumni_child      | boolean                        | DEFAULT false
+ is_inclusion_student | boolean                        | DEFAULT false
+ created_at           | timestamp(6) without time zone | NOT NULL
+ updated_at           | timestamp(6) without time zone | 
+```
+
+**CRITICAL NOTES**:
+- Column name is `first_name`, NOT `name` or `student_name`
+- Last name split into `paternal_last_name` and `maternal_last_name`, NOT `last_name`
+- Date of birth is `birth_date`, NOT `date_of_birth`
+- `created_at` has NO DEFAULT VALUE - must be explicitly set in INSERT: `created_at = NOW()`
+- `updated_at` has NO DEFAULT VALUE - must be explicitly set in UPDATE: `updated_at = NOW()`
+
+**Referenced by**: `applications.student_id` → `students.id`
+
+#### applications
+
+```sql
+Table "public.applications"
+      Column       |              Type              | Constraints
+-------------------+--------------------------------+-------------
+ id                | bigint                         | PK (IDENTITY)
+ student_id        | bigint                         | FK → students(id), UNIQUE
+ status            | character varying(255)         | NOT NULL, CHECK
+ submission_date   | timestamp(6) without time zone | NOT NULL
+ father_id         | bigint                         | FK → parents(id), UNIQUE
+ mother_id         | bigint                         | FK → parents(id), UNIQUE
+ guardian_id       | bigint                         | FK → guardians(id), UNIQUE
+ supporter_id      | bigint                         | FK → supporters(id), UNIQUE
+ applicant_user_id | bigint                         | FK → users(id)
+ created_at        | timestamp(6) without time zone | NOT NULL
+ updated_at        | timestamp(6) without time zone | 
+ deleted_at        | timestamp without time zone    | 
+ is_archived       | boolean                        | NOT NULL DEFAULT false
+```
+
+**Valid Status Values** (CHECK constraint):
+- `PENDING`
+- `UNDER_REVIEW`
+- `DOCUMENTS_REQUESTED`
+- `INTERVIEW_SCHEDULED`
+- `EXAM_SCHEDULED`
+- `APPROVED`
+- `REJECTED`
+- `WAITLIST`
+
+**Referenced by**:
+- `evaluations.application_id` → `applications.id`
+- `documents.application_id` → `applications.id`
+- `interviews.application_id` → `applications.id` (ON DELETE CASCADE)
+
+#### evaluations
+
+```sql
+Table "public.evaluations"
+          Column           |              Type              | Constraints
+---------------------------+--------------------------------+-------------
+ id                        | bigint                         | PK (IDENTITY)
+ application_id            | bigint                         | FK → applications(id), NOT NULL
+ evaluator_id              | bigint                         | FK → users(id), NOT NULL
+ evaluation_type           | character varying(255)         | NOT NULL, CHECK
+ status                    | character varying(255)         | NOT NULL, CHECK
+ score                     | integer                        | 
+ max_score                 | integer                        | DEFAULT 100
+ evaluation_date           | timestamp(6) without time zone | 
+ completion_date           | timestamp(6) without time zone | 
+ interview_data            | jsonb                          | DEFAULT '{}'::jsonb
+ created_at                | timestamp(6) without time zone | NOT NULL
+```
+
+**Valid Evaluation Types** (CHECK constraint):
+- `LANGUAGE_EXAM`
+- `MATHEMATICS_EXAM`
+- `ENGLISH_EXAM`
+- `CYCLE_DIRECTOR_REPORT`
+- `CYCLE_DIRECTOR_INTERVIEW`
+- `PSYCHOLOGICAL_INTERVIEW`
+- `FAMILY_INTERVIEW`
+
+**Valid Status Values** (CHECK constraint):
+- `PENDING`
+- `IN_PROGRESS`
+- `COMPLETED`
+- `REVIEWED`
+- `APPROVED`
+
+**CRITICAL**: `(application_id, evaluation_type)` should be unique (one evaluation of each type per application).
+
+#### interviews
+
+```sql
+Table "public.interviews"
+       Column       |              Type              | Constraints
+--------------------+--------------------------------+-------------
+ id                 | bigint                         | PK (IDENTITY)
+ application_id     | bigint                         | FK → applications(id), NOT NULL, ON DELETE CASCADE
+ interview_type     | character varying(255)         | NOT NULL, CHECK
+ scheduled_date     | date                           | 
+ scheduled_time     | time without time zone         | 
+ interviewer_id     | bigint                         | FK → users(id)
+ status             | character varying(255)         | NOT NULL, CHECK
+ notes              | text                           | 
+ result             | character varying(50)          | CHECK
+ score              | integer                        | 
+ created_at         | timestamp(6) without time zone | NOT NULL
+ updated_at         | timestamp(6) without time zone | 
+```
+
+**Valid Interview Types** (CHECK constraint):
+- `FAMILY`
+- `CYCLE_DIRECTOR`
+- `INDIVIDUAL`
+
+**Valid Status Values** (CHECK constraint):
+- `SCHEDULED`
+- `COMPLETED`
+- `CANCELLED`
+- `RESCHEDULED`
+
+**Valid Result Values** (CHECK constraint):
+- `POSITIVE`
+- `NEGATIVE`
+- `NEUTRAL`
+
+**CRITICAL**: Field name is `interview_type`, NOT `type` (backend returns this field, frontend should map to `type`).
+
+#### documents
+
+```sql
+Table "public.documents"
+       Column       |              Type              | Constraints
+--------------------+--------------------------------+-------------
+ id                 | bigint                         | PK (IDENTITY)
+ application_id     | bigint                         | FK → applications(id), NOT NULL
+ document_type      | character varying(255)         | NOT NULL, CHECK
+ file_path          | character varying(500)         | NOT NULL
+ file_name          | character varying(255)         | 
+ file_size          | bigint                         | 
+ mime_type          | character varying(100)         | 
+ status             | character varying(50)          | NOT NULL DEFAULT 'PENDING'
+ uploaded_at        | timestamp(6) without time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+ reviewed_at        | timestamp(6) without time zone | 
+ reviewed_by        | bigint                         | FK → users(id)
+ rejection_reason   | text                           | 
+ created_at         | timestamp(6) without time zone | NOT NULL
+ updated_at         | timestamp(6) without time zone | 
+```
+
+**Valid Document Types** (CHECK constraint):
+- `BIRTH_CERTIFICATE`
+- `GRADES_2023`
+- `GRADES_2024`
+- `GRADES_2025_SEMESTER_1`
+- `PERSONALITY_REPORT_2024`
+- `PERSONALITY_REPORT_2025_SEMESTER_1`
+- `STUDENT_PHOTO`
+- `BAPTISM_CERTIFICATE`
+- `PREVIOUS_SCHOOL_REPORT`
+- `MEDICAL_CERTIFICATE`
+- `PSYCHOLOGICAL_REPORT`
+
+**CRITICAL**: When adding new document types:
+1. Update CHECK constraint in database
+2. Update `VALID_DOCUMENT_TYPES` in `application-service/src/middleware/upload.js`
+3. Both lists MUST be synchronized
+
+### Related Entities
+
+#### parents
+
+```sql
+Table "public.parents"
+   Column    |              Type              | Constraints
+-------------+--------------------------------+-------------
+ id          | bigint                         | PK (IDENTITY)
+ full_name   | character varying(255)         | NOT NULL
+ rut         | character varying(255)         | NOT NULL
+ email       | character varying(255)         | NOT NULL
+ phone       | character varying(255)         | NOT NULL
+ address     | character varying(255)         | NOT NULL
+ profession  | character varying(255)         | NOT NULL
+ workplace   | character varying(255)         | 
+ parent_type | character varying(255)         | NOT NULL, CHECK
+ created_at  | timestamp(6) without time zone | NOT NULL
+ updated_at  | timestamp(6) without time zone | 
+```
+
+**Valid Parent Types** (CHECK constraint):
+- `FATHER`
+- `MOTHER`
+
+**Referenced by**:
+- `applications.father_id` → `parents.id`
+- `applications.mother_id` → `parents.id`
+
+#### guardians
+
+```sql
+Table "public.guardians"
+    Column    |              Type              | Constraints
+--------------+--------------------------------+-------------
+ id           | bigint                         | PK (IDENTITY)
+ full_name    | character varying(255)         | NOT NULL
+ rut          | character varying(255)         | NOT NULL
+ email        | character varying(255)         | NOT NULL
+ phone        | character varying(255)         | NOT NULL
+ relationship | character varying(255)         | NOT NULL, CHECK
+ profession   | character varying(255)         | 
+ workplace    | character varying(255)         | 
+ created_at   | timestamp(6) without time zone | NOT NULL
+ updated_at   | timestamp(6) without time zone | 
+```
+
+**Valid Relationships** (CHECK constraint):
+- `PADRE`
+- `MADRE`
+- `ABUELO`
+- `TIO`
+- `HERMANO`
+- `TUTOR`
+- `OTRO`
+
+**Referenced by**: `applications.guardian_id` → `guardians.id`
+
+#### users
+
+```sql
+Table "public.users"
+       Column        |              Type              | Constraints
+---------------------+--------------------------------+-------------
+ id                  | bigint                         | PK (IDENTITY)
+ username            | character varying(255)         | UNIQUE, NOT NULL
+ email               | character varying(255)         | UNIQUE, NOT NULL
+ password_hash       | character varying(255)         | NOT NULL
+ first_name          | character varying(255)         | NOT NULL
+ last_name           | character varying(255)         | NOT NULL
+ role                | character varying(50)          | NOT NULL, CHECK
+ is_active           | boolean                        | NOT NULL DEFAULT true
+ last_login          | timestamp(6) without time zone | 
+ created_at          | timestamp(6) without time zone | NOT NULL
+ updated_at          | timestamp(6) without time zone | 
+ password_reset_token| character varying(255)         | 
+ reset_token_expires | timestamp(6) without time zone | 
+```
+
+**Valid Roles** (CHECK constraint):
+- `ADMIN`
+- `COORDINATOR`
+- `APODERADO`
+- `TEACHER`
+- `PSYCHOLOGIST`
+- `CYCLE_DIRECTOR`
+
+**Referenced by**:
+- `applications.applicant_user_id` → `users.id`
+- `evaluations.evaluator_id` → `users.id`
+- `interviews.interviewer_id` → `users.id`
+- `documents.reviewed_by` → `users.id`
+
+### Foreign Key Cascade Rules
+
+**ON DELETE CASCADE** (child records automatically deleted):
+- `interviews.application_id` → `applications.id` (ON DELETE CASCADE)
+
+**Default RESTRICT** (all other FKs):
+- Cannot delete parent record if child records exist
+- Must delete children first before deleting parent
+
+### Safe Delete Order for Student Removal
+
+When deleting a student and all related data:
+
+```sql
+-- 1. Delete evaluations (by application_id)
+DELETE FROM evaluations WHERE application_id IN (
+  SELECT id FROM applications WHERE student_id = <student_id>
+);
+
+-- 2. Delete interviews (automatically cascades from application delete, but can be explicit)
+DELETE FROM interviews WHERE application_id IN (
+  SELECT id FROM applications WHERE student_id = <student_id>
+);
+
+-- 3. Delete documents (by application_id)
+DELETE FROM documents WHERE application_id IN (
+  SELECT id FROM applications WHERE student_id = <student_id>
+);
+
+-- 4. Optional: Delete guardian if not shared (check for other applications first)
+DELETE FROM guardians WHERE id IN (
+  SELECT guardian_id FROM applications WHERE student_id = <student_id>
+) AND id NOT IN (
+  SELECT guardian_id FROM applications WHERE student_id != <student_id> AND guardian_id IS NOT NULL
+);
+
+-- 5. Delete application
+DELETE FROM applications WHERE student_id = <student_id>;
+
+-- 6. Finally delete student
+DELETE FROM students WHERE id = <student_id>;
+```
+
+### Common Query Patterns
+
+**Full student name concatenation**:
+```sql
+SELECT 
+  first_name || ' ' || paternal_last_name || ' ' || maternal_last_name AS full_name
+FROM students
+WHERE id = $1;
+```
+
+**Case-insensitive name search (PostgreSQL syntax)**:
+```sql
+SELECT * FROM students 
+WHERE first_name ILIKE '%rosario%' 
+  OR paternal_last_name ILIKE '%fuenzalida%';
+```
+
+**Get application with student details**:
+```sql
+SELECT 
+  a.id AS application_id,
+  a.status,
+  s.first_name,
+  s.paternal_last_name,
+  s.maternal_last_name,
+  s.birth_date,
+  s.grade_applied
+FROM applications a
+JOIN students s ON a.student_id = s.id
+WHERE a.id = $1;
+```
+
+**Get evaluations with evaluator name**:
+```sql
+SELECT 
+  e.*,
+  u.first_name || ' ' || u.last_name AS evaluator_name
+FROM evaluations e
+JOIN users u ON e.evaluator_id = u.id
+WHERE e.application_id = $1;
+```
+
+### Schema Validation Checklist
+
+Before deploying changes that involve database queries:
+
+- [ ] Verify column names match actual schema (e.g., `first_name` not `name`)
+- [ ] Check that timestamp fields are set explicitly (`created_at = NOW()`)
+- [ ] Validate enum values against CHECK constraints
+- [ ] Ensure foreign key references use correct column names
+- [ ] Test DELETE operations follow safe cascade order
+- [ ] Confirm camelCase ↔ snake_case conversion in model `toJSON()` methods
+
+### Troubleshooting Database Errors
+
+**Error: "column does not exist"**
+- **Cause**: Using incorrect column name (e.g., `last_name` instead of `paternal_last_name`)
+- **Fix**: Refer to this schema, use `\d table_name` in psql to verify
+
+**Error: "null value violates not-null constraint"**
+- **Cause**: Missing required field (often `created_at`, `updated_at`)
+- **Fix**: Explicitly set in INSERT/UPDATE: `created_at = NOW()`
+
+**Error: "violates check constraint"**
+- **Cause**: Invalid enum value (e.g., wrong status, document type, or role)
+- **Fix**: Use only values listed in CHECK constraint above
+
+**Error: "update or delete violates foreign key constraint"**
+- **Cause**: Trying to delete parent record with existing child records
+- **Fix**: Delete children first, or use cascade delete where configured
+

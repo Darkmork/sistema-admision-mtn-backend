@@ -120,6 +120,21 @@ router.post('/', authenticate, validateCsrf, requireRole('ADMIN', 'COORDINATOR',
       });
     }
 
+    // 🛡️ DUPLICATE VALIDATION: Check if this exact slot already exists
+    const duplicateCheck = await dbPool.query(`
+      SELECT id, is_active FROM interviewer_schedules
+      WHERE interviewer_id = $1 AND start_time = $2 AND end_time = $3
+      ORDER BY id DESC LIMIT 1
+    `, [interviewerId, startTime, endTime]);
+
+    if (duplicateCheck.rows.length > 0 && duplicateCheck.rows[0].is_active) {
+      return res.status(409).json({
+        success: false,
+        error: 'DUPLICATE_SLOT',
+        message: `Ya existe un horario activo para este usuario de ${startTime} a ${endTime}`
+      });
+    }
+
     const result = await dbPool.query(`
       INSERT INTO interviewer_schedules (
         interviewer_id, day_of_week, start_time, end_time, year,
@@ -193,7 +208,25 @@ router.post('/interviewer/:interviewerId/recurring/:year', authenticate, validat
     }
 
     const created = [];
+    const skipped = [];
+
     for (const schedule of schedules) {
+      // 🛡️ DUPLICATE VALIDATION: Check if this exact slot already exists
+      const duplicateCheck = await dbPool.query(`
+        SELECT id, is_active FROM interviewer_schedules
+        WHERE interviewer_id = $1 AND start_time = $2 AND end_time = $3
+        ORDER BY id DESC LIMIT 1
+      `, [interviewerId, schedule.startTime, schedule.endTime]);
+
+      if (duplicateCheck.rows.length > 0 && duplicateCheck.rows[0].is_active) {
+        skipped.push({
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          reason: 'Ya existe este horario activo'
+        });
+        continue; // Skip duplicate, continue with next slot
+      }
+
       const result = await dbPool.query(`
         INSERT INTO interviewer_schedules (
           interviewer_id, day_of_week, start_time, end_time, year,
@@ -230,7 +263,16 @@ router.post('/interviewer/:interviewerId/recurring/:year', authenticate, validat
       updatedAt: row.updated_at
     }));
 
-    res.status(201).json(response);
+    const statusCode = skipped.length > 0 ? 207 : 201; // 207 Multi-Status si hay duplicados omitidos
+
+    res.status(statusCode).json({
+      success: true,
+      created: response,
+      skipped: skipped.length > 0 ? skipped : undefined,
+      message: skipped.length > 0
+        ? `${created.length} horarios creados exitosamente. ${skipped.length} duplicados omitidos.`
+        : `${created.length} horarios creados exitosamente.`
+    });
   } catch (error) {
     console.error('Error creating recurring schedules:', error);
     res.status(500).json({
