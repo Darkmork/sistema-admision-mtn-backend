@@ -416,9 +416,16 @@ class InterviewService {
 
   async deleteInterview(id) {
     return await writeOperationBreaker.fire(async () => {
-      const result = await dbPool.query('DELETE FROM interviews WHERE id = $1 RETURNING *', [id]);
+      // Soft delete: Change status to 'CANCELLED' instead of hard deleting
+      const result = await dbPool.query(
+        `UPDATE interviews
+         SET status = 'CANCELLED', updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [id]
+      );
       if (result.rows.length === 0) return null;
-      logger.info(`Deleted interview ${id}`);
+      logger.info(`Interview ${id} marked as CANCELLED (soft delete)`);
       return Interview.fromDatabaseRow(result.rows[0]);
     });
   }
