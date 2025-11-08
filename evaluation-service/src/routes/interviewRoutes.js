@@ -256,6 +256,7 @@ router.get('/interviewer/:interviewerId', authenticate, async (req, res) => {
     const { dbPool } = require('../config/database');
 
     // Query to get interviews where user is interviewer or second interviewer
+    // 🛡️ CRITICAL: Exclude CANCELLED and RESCHEDULED interviews from dashboard
     const query = `
       SELECT
         i.*,
@@ -271,7 +272,8 @@ router.get('/interviewer/:interviewerId', authenticate, async (req, res) => {
       LEFT JOIN students s ON a.student_id = s.id
       LEFT JOIN users u ON i.interviewer_user_id = u.id
       LEFT JOIN users u2 ON i.second_interviewer_id = u2.id
-      WHERE i.interviewer_user_id = $1 OR i.second_interviewer_id = $1
+      WHERE (i.interviewer_user_id = $1 OR i.second_interviewer_id = $1)
+        AND i.status NOT IN ('CANCELLED', 'RESCHEDULED')
       ORDER BY i.scheduled_date DESC, i.scheduled_time DESC
     `;
 
