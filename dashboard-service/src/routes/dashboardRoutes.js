@@ -364,8 +364,18 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
  * @query   academicYear, grade, status, sortBy, sortOrder
  */
 router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
+  console.log('🔍 [/applicant-metrics] Query params recibidos:', req.query);
+
   const { academicYear, grade, status, sortBy = 'studentName', sortOrder = 'ASC' } = req.query;
   const yearFilter = academicYear ? parseInt(academicYear) : new Date().getFullYear() + 1;
+
+  console.log('📊 [/applicant-metrics] Filtros procesados:', {
+    academicYear: yearFilter,
+    grade: grade || 'Sin filtro',
+    status: status || 'Sin filtro',
+    sortBy,
+    sortOrder
+  });
 
   const client = await dbPool.connect();
   try {
@@ -378,15 +388,19 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
       paramCount++;
       conditions.push(`s.grade_applied = $${paramCount}`);
       params.push(grade);
+      console.log(`🔧 [/applicant-metrics] Agregando filtro de curso: $${paramCount} = ${grade}`);
     }
 
     if (status) {
       paramCount++;
       conditions.push(`a.status = $${paramCount}`);
       params.push(status.toUpperCase());
+      console.log(`🔧 [/applicant-metrics] Agregando filtro de estado: $${paramCount} = ${status.toUpperCase()}`);
     }
 
     const whereClause = conditions.join(' AND ');
+    console.log('📝 [/applicant-metrics] WHERE clause construido:', whereClause);
+    console.log('📋 [/applicant-metrics] Parámetros SQL:', params);
 
     // Validate sortBy to prevent SQL injection
     const validSortColumns = ['studentName', 'gradeApplied', 'evaluationPassRate', 'interviewAvg', 'applicationStatus'];
@@ -579,6 +593,13 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
           completionRate: docs.total > 0 ? ((docs.approved / docs.total) * 100).toFixed(1) : '0.0'
         }
       };
+    });
+
+    console.log(`✅ [/applicant-metrics] Total de postulantes encontrados: ${applicants.length}`);
+    console.log(`📊 [/applicant-metrics] Filtros aplicados en respuesta:`, {
+      academicYear: yearFilter,
+      grade: grade || 'Sin filtro',
+      status: status || 'Sin filtro'
     });
 
     res.json({
