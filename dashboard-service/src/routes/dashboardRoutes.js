@@ -171,6 +171,7 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
         FROM applications
         WHERE created_at >= $1
           AND EXTRACT(YEAR FROM created_at) = $2
+          AND deleted_at IS NULL
         GROUP BY TO_CHAR(created_at, 'YYYY-MM')
         ORDER BY month ASC
       `, [twelveMonthsAgo.toISOString(), yearFilter])
@@ -184,6 +185,7 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
           COUNT(*) as count
         FROM applications
         WHERE EXTRACT(YEAR FROM created_at) = $1
+          AND deleted_at IS NULL
         GROUP BY status
       `, [yearFilter])
     );
