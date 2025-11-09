@@ -154,36 +154,64 @@ class EvaluationService {
       const evaluation = new Evaluation({ ...evaluationData, evaluatorId });
       const dbData = evaluation.toDatabase();
 
-      // Check for duplicate evaluation (same application_id and evaluation_type)
-      const duplicateCheck = await dbPool.query(
-        `SELECT id, evaluator_id, status
-         FROM evaluations
-         WHERE application_id = $1 AND evaluation_type = $2`,
-        [dbData.application_id, dbData.evaluation_type]
-      );
+      // Use a transaction with row-level locking to prevent race conditions
+      const client = await dbPool.connect();
 
-      if (duplicateCheck.rows.length > 0) {
-        const existing = duplicateCheck.rows[0];
-        logger.warn(`Duplicate evaluation attempt: application_id=${dbData.application_id}, type=${dbData.evaluation_type}, existing_id=${existing.id}`);
-        throw new Error(`Ya existe una evaluación de tipo ${dbData.evaluation_type} asignada para esta postulación (ID: ${existing.id}, Estado: ${existing.status})`);
+      try {
+        await client.query('BEGIN');
+
+        // Check for duplicate with FOR UPDATE to lock rows and prevent race conditions
+        // This ensures no other transaction can insert a duplicate while we're checking
+        const duplicateCheck = await client.query(
+          `SELECT id, evaluator_id, status
+           FROM evaluations
+           WHERE application_id = $1
+             AND evaluation_type = $2
+             AND evaluator_id = $3
+           FOR UPDATE`,
+          [dbData.application_id, dbData.evaluation_type, dbData.evaluator_id]
+        );
+
+        if (duplicateCheck.rows.length > 0) {
+          const existing = duplicateCheck.rows[0];
+          logger.warn(
+            `Duplicate evaluation attempt: application_id=${dbData.application_id}, ` +
+            `type=${dbData.evaluation_type}, evaluator_id=${dbData.evaluator_id}, ` +
+            `existing_id=${existing.id}`
+          );
+          throw new Error(
+            `Ya existe una evaluación de tipo ${dbData.evaluation_type} ` +
+            `del evaluador ${dbData.evaluator_id} para esta postulación ` +
+            `(ID: ${existing.id}, Estado: ${existing.status})`
+          );
+        }
+
+        // Insert new evaluation within the transaction
+        const result = await client.query(
+          `INSERT INTO evaluations (
+            application_id, evaluator_id, evaluation_type, score, max_score,
+            strengths, areas_for_improvement, observations, recommendations, status, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+          RETURNING *`,
+          [
+            dbData.application_id, dbData.evaluator_id, dbData.evaluation_type,
+            dbData.score, dbData.max_score, dbData.strengths,
+            dbData.areas_for_improvement, dbData.observations,
+            dbData.recommendations, 'PENDING'
+          ]
+        );
+
+        await client.query('COMMIT');
+        logger.info(`Created evaluation ${result.rows[0].id} with transaction lock`);
+        return Evaluation.fromDatabaseRow(result.rows[0]);
+
+      } catch (error) {
+        await client.query('ROLLBACK');
+        logger.error(`Error creating evaluation, transaction rolled back: ${error.message}`);
+        throw error;
+      } finally {
+        client.release();
       }
-
-      const result = await dbPool.query(
-        `INSERT INTO evaluations (
-          application_id, evaluator_id, evaluation_type, score, max_score,
-          strengths, areas_for_improvement, observations, recommendations, status, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
-        RETURNING *`,
-        [
-          dbData.application_id, dbData.evaluator_id, dbData.evaluation_type,
-          dbData.score, dbData.max_score, dbData.strengths,
-          dbData.areas_for_improvement, dbData.observations,
-          dbData.recommendations, 'PENDING'
-        ]
-      );
-
-      logger.info(`Created evaluation ${result.rows[0].id}`);
-      return Evaluation.fromDatabaseRow(result.rows[0]);
     });
   }
 
