@@ -436,6 +436,27 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
       `, params)
     );
 
+    console.log(`📊 [/applicant-metrics] Aplicaciones obtenidas de la query principal: ${applicantMetricsQuery.rows.length}`);
+
+    // Extract application IDs for subsequent queries
+    const applicationIds = applicantMetricsQuery.rows.map(row => row.application_id);
+
+    if (applicationIds.length === 0) {
+      console.log('⚠️ [/applicant-metrics] No se encontraron aplicaciones con los filtros aplicados');
+      return res.json({
+        success: true,
+        data: [],
+        meta: {
+          total: 0,
+          academicYear: yearFilter,
+          filters: { grade, status },
+          sortBy: sortColumn,
+          sortOrder: order
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+
     // Get detailed evaluations for each application (individual exam scores)
     const evaluationsQuery = await mediumQueryBreaker.fire(async () =>
       await client.query(`
@@ -446,11 +467,8 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
           e.score,
           e.max_score
         FROM evaluations e
-        WHERE e.application_id = ANY(
-          SELECT id FROM applications a
-          WHERE ${whereClause}
-        )
-      `, params)
+        WHERE e.application_id = ANY($1)
+      `, [applicationIds])
     );
 
     // Get detailed family interviews (individual scores from each interviewer)
@@ -466,11 +484,8 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
         FROM interviews i
         LEFT JOIN users u ON u.id = i.interviewer_user_id
         WHERE i.interview_type = 'FAMILY'
-          AND i.application_id = ANY(
-            SELECT id FROM applications a
-            WHERE ${whereClause}
-          )
-      `, params)
+          AND i.application_id = ANY($1)
+      `, [applicationIds])
     );
 
     // Get document completion data
@@ -481,12 +496,9 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
           COUNT(*) FILTER (WHERE d.approval_status = 'APPROVED') as documents_approved,
           COUNT(*) as documents_total
         FROM documents d
-        WHERE d.application_id = ANY(
-          SELECT id FROM applications a
-          WHERE ${whereClause}
-        )
+        WHERE d.application_id = ANY($1)
         GROUP BY d.application_id
-      `, params)
+      `, [applicationIds])
     );
 
     // Map evaluations by application_id
