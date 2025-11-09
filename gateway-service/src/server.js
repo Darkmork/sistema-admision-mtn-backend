@@ -96,6 +96,9 @@ app.use(cors({
   allowedHeaders: [
     'Content-Type',
     'Authorization',
+    'Cache-Control',
+    'Pragma',
+    'Expires',
     'x-csrf-token',
     'X-CSRF-Token',
     'x-correlation-id',
