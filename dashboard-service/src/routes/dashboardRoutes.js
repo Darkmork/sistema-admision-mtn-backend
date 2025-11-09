@@ -188,6 +188,9 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
       `, [yearFilter])
     );
 
+    logger.info(`[DEBUG] Status stats query returned ${statusStatsQuery.rows.length} rows for year ${yearFilter}:`);
+    logger.info(JSON.stringify(statusStatsQuery.rows, null, 2));
+
     // 5. Años académicos disponibles
     const academicYearsQuery = await simpleQueryBreaker.fire(async () =>
       await client.query(`
@@ -286,13 +289,20 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
     statusStatsQuery.rows.forEach(row => {
       const dbStatus = row.status.toUpperCase();
       const mappedStatus = statusMapping[dbStatus];
+      logger.info(`[DEBUG] Mapping status: ${row.status} (${dbStatus}) → ${mappedStatus}, count: ${row.count}`);
       if (mappedStatus) {
         statusBreakdown[mappedStatus] += parseInt(row.count);
+      } else {
+        logger.warn(`[DEBUG] Unmapped status: ${dbStatus}`);
       }
     });
 
+    logger.info(`[DEBUG] Final statusBreakdown:`, JSON.stringify(statusBreakdown, null, 2));
+
     const academicYears = academicYearsQuery.rows.map(row => parseInt(row.application_year));
     const totalApps = Object.values(statusBreakdown).reduce((sum, val) => sum + val, 0);
+
+    logger.info(`[DEBUG] Total apps calculated: ${totalApps}`);
 
     // Grade breakdown with status counts AND percentage
     const gradeDistribution = gradeBreakdownQuery.rows.map(row => {
