@@ -856,3 +856,5 @@ router.get('/performance-metrics', authenticate, requireRole('ADMIN'), async (re
 });
 
 module.exports = router;
+
+// Railway auto-deploy trigger - 1762725993
