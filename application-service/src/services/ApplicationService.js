@@ -19,9 +19,8 @@ class ApplicationService {
       const offset = page * limit;
 
       // Include student, guardian, father, and mother data with LEFT JOIN
-      // DISTINCT ON ensures only one row per application (prevents duplicates from multiple JOINs)
       let query = `
-        SELECT DISTINCT ON (a.id) a.*,
+        SELECT a.*,
                s.rut as student_rut,
                s.nationality as student_nationality,
                s.passport as student_passport,
