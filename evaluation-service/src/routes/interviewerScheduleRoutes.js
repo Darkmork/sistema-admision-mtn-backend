@@ -29,8 +29,8 @@ router.get('/interviewer/:interviewerId', authenticate, async (req, res) => {
         role: row.role
       },
       dayOfWeek: row.day_of_week,
-      startTime: row.start_time,
-      endTime: row.end_time,
+      startTime: row.start_time ? row.start_time.substring(0, 5) : row.start_time, // Remove seconds: "08:00:00" -> "08:00"
+      endTime: row.end_time ? row.end_time.substring(0, 5) : row.end_time, // Remove seconds: "17:00:00" -> "17:00"
       year: row.year,
       specificDate: row.specific_date,
       scheduleType: row.schedule_type || 'RECURRING',
@@ -76,8 +76,8 @@ router.get('/interviewer/:interviewerId/year/:year', authenticate, async (req, r
         role: row.role
       },
       dayOfWeek: row.day_of_week,
-      startTime: row.start_time,
-      endTime: row.end_time,
+      startTime: row.start_time ? row.start_time.substring(0, 5) : row.start_time, // Remove seconds: "08:00:00" -> "08:00"
+      endTime: row.end_time ? row.end_time.substring(0, 5) : row.end_time, // Remove seconds: "17:00:00" -> "17:00"
       year: row.year,
       specificDate: row.specific_date,
       scheduleType: row.schedule_type || 'RECURRING',
@@ -253,8 +253,8 @@ router.post('/interviewer/:interviewerId/recurring/:year', authenticate, validat
         role: user.role
       },
       dayOfWeek: row.day_of_week,
-      startTime: row.start_time,
-      endTime: row.end_time,
+      startTime: row.start_time ? row.start_time.substring(0, 5) : row.start_time, // Remove seconds: "08:00:00" -> "08:00"
+      endTime: row.end_time ? row.end_time.substring(0, 5) : row.end_time, // Remove seconds: "17:00:00" -> "17:00"
       year: row.year,
       scheduleType: row.schedule_type,
       isActive: row.is_active,
