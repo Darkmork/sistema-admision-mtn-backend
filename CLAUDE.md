@@ -1045,7 +1045,15 @@ Each service has its own README with:
 - Testing instructions
 - Deployment notes
 
-**Recent Changes (2025-10-26)**:
+**Recent Changes (2025-11-09)**:
+- **WeeklyCalendar Weekend Crash Fix** - Fixed component crash when loading SATURDAY schedules
+  - Problem: Calendar only supports Mon-Fri but DB contained weekend schedules
+  - Added validation to skip SATURDAY/SUNDAY schedules with warning logs
+  - Prevents crash: "Cannot read properties of undefined (reading '08:00')"
+  - Interview schedules now display correctly in User Management
+  - Commit: `93c242d`
+
+**Previous Changes (2025-10-26)**:
 - **Dashboard Service 500 Error Fix** - Fixed runtime module loading issue
   - Moved logger, cache, and circuitBreakers requires to top of dashboardRoutes.js
   - Removed dynamic requires inside route handlers (anti-pattern)

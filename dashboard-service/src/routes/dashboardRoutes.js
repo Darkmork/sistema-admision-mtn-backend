@@ -261,7 +261,7 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
       underReview: 0  // Add this field for frontend compatibility
     }));
 
-    // Status breakdown with proper mapping
+    // Status breakdown with proper mapping from DB to camelCase
     const statusBreakdown = {
       submitted: 0,
       underReview: 0,
@@ -270,9 +270,25 @@ router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINA
       waitlist: 0
     };
 
+    // Map database status values to camelCase keys
+    const statusMapping = {
+      'SUBMITTED': 'submitted',
+      'PENDING': 'submitted',  // PENDING maps to submitted
+      'UNDER_REVIEW': 'underReview',
+      'DOCUMENTS_REQUESTED': 'underReview',
+      'INTERVIEW_SCHEDULED': 'underReview',
+      'EXAM_SCHEDULED': 'underReview',
+      'APPROVED': 'approved',
+      'REJECTED': 'rejected',
+      'WAITLIST': 'waitlist'
+    };
+
     statusStatsQuery.rows.forEach(row => {
-      const status = row.status.toLowerCase();
-      statusBreakdown[status] = parseInt(row.count);
+      const dbStatus = row.status.toUpperCase();
+      const mappedStatus = statusMapping[dbStatus];
+      if (mappedStatus) {
+        statusBreakdown[mappedStatus] += parseInt(row.count);
+      }
     });
 
     const academicYears = academicYearsQuery.rows.map(row => parseInt(row.application_year));
