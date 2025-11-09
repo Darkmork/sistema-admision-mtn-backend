@@ -112,7 +112,7 @@ router.get(
  */
 router.get('/admin/detailed-stats', authenticate, requireRole('ADMIN', 'COORDINATOR'), async (req, res) => {
   const { academicYear } = req.query;
-  const yearFilter = academicYear ? parseInt(academicYear) : new Date().getFullYear() + 1;
+  const yearFilter = academicYear ? parseInt(academicYear) : new Date().getFullYear();
 
   // Check cache first
   const cacheKey = `dashboard:detailed-stats:${yearFilter}`;
@@ -367,7 +367,7 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
   console.log('🔍 [/applicant-metrics] Query params recibidos:', req.query);
 
   const { academicYear, grade, status, sortBy = 'studentName', sortOrder = 'ASC' } = req.query;
-  const yearFilter = academicYear ? parseInt(academicYear) : new Date().getFullYear() + 1;
+  const yearFilter = academicYear ? parseInt(academicYear) : new Date().getFullYear();
 
   console.log('📊 [/applicant-metrics] Filtros procesados:', {
     academicYear: yearFilter,
