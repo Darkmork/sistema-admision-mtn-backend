@@ -662,6 +662,8 @@ router.put('/:evaluationId/family-interview-data', authenticate, validateCsrf, r
       `UPDATE evaluations
        SET interview_data = $1,
            score = $2,
+           status = 'COMPLETED',
+           completion_date = NOW(),
            updated_at = NOW()
        WHERE id = $3
        RETURNING *`,
