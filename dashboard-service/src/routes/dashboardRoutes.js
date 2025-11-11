@@ -500,6 +500,7 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
     );
 
     // Get detailed family interviews (individual scores from each interviewer)
+    // IMPORTANT: Use interviews table (score/10), NOT evaluations table (score/100)
     const interviewsQuery = await mediumQueryBreaker.fire(async () =>
       await client.query(`
         SELECT
@@ -507,6 +508,7 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
           i.type as interview_type,
           i.status,
           i.score,
+          10 as max_score,
           i.result,
           u.first_name || ' ' || u.last_name as interviewer_name
         FROM interviews i
@@ -552,6 +554,7 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
       interviewsByApp[interview.application_id].push({
         status: interview.status,
         score: interview.score,
+        maxScore: interview.max_score || 10, // Default to 10 for interviews table
         result: interview.result,
         interviewerName: interview.interviewer_name
       });
@@ -588,6 +591,7 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
       const familyInterviews = interviews.map(i => ({
         interviewerName: i.interviewerName || 'Sin asignar',
         score: i.score,
+        maxScore: i.maxScore || 100, // Default to 100 if not set
         result: i.result,
         status: i.status
       }));
