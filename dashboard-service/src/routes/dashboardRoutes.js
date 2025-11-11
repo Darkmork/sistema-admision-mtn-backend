@@ -583,8 +583,14 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
       const completedExams = [mathExam, languageExam, englishExam].filter(e => e && e.status === 'COMPLETED').length;
       const examCompletionRate = totalExams > 0 ? ((completedExams / totalExams) * 100).toFixed(1) : '0.0';
 
-      // Extract family interview scores
-      const completedInterviews = interviews.filter(i => i.status === 'COMPLETED' && i.score !== null);
+      // Extract ALL family interviews (not just completed ones)
+      // Frontend will handle displaying percentage only for those with scores
+      const familyInterviews = interviews.map(i => ({
+        interviewerName: i.interviewerName || 'Sin asignar',
+        score: i.score,
+        result: i.result,
+        status: i.status
+      }));
 
       return {
         applicationId: appId,
@@ -620,11 +626,8 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
         },
 
         // Detailed family interview scores (from each interviewer)
-        familyInterviews: completedInterviews.map(i => ({
-          interviewerName: i.interviewerName || 'Sin asignar',
-          score: i.score,
-          result: i.result
-        })),
+        // Include ALL interviews, not just completed ones
+        familyInterviews: familyInterviews,
 
         // Document metrics
         documents: {
