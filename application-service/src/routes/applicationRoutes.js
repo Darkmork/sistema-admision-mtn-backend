@@ -663,6 +663,75 @@ router.patch(
   ApplicationController.updateApplicationStatus.bind(ApplicationController)
 );
 
+// PATCH /api/applications/:id/document-notification-sent - Mark that document notification was sent
+router.patch(
+  '/:id/document-notification-sent',
+  authenticate,
+  validateCsrf,
+  requireRole('ADMIN', 'COORDINATOR'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Check if all documents are approved
+      const docsResult = await dbPool.query(
+        `SELECT COUNT(*) as total,
+                COUNT(CASE WHEN approval_status = 'APPROVED' THEN 1 END) as approved
+         FROM documents
+         WHERE application_id = $1`,
+        [id]
+      );
+
+      const { total, approved } = docsResult.rows[0];
+      const allDocsApproved = total > 0 && parseInt(total) === parseInt(approved);
+
+      // Update application with notification timestamp and documentosCompletos
+      const result = await dbPool.query(
+        `UPDATE applications
+         SET last_document_notification_at = NOW(),
+             documentos_completos = $2,
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING id, last_document_notification_at, documentos_completos`,
+        [id, allDocsApproved]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Application not found'
+        });
+      }
+
+      console.log(`✅ Document notification marked for application ${id}:`, {
+        timestamp: result.rows[0].last_document_notification_at,
+        allDocsApproved,
+        totalDocs: total,
+        approvedDocs: approved
+      });
+
+      res.json({
+        success: true,
+        data: {
+          id: result.rows[0].id,
+          lastDocumentNotificationAt: result.rows[0].last_document_notification_at,
+          documentosCompletos: result.rows[0].documentos_completos,
+          totalDocuments: parseInt(total),
+          approvedDocuments: parseInt(approved),
+          allDocsApproved
+        }
+      });
+    } catch (error) {
+      console.error('Error marking document notification:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error marking document notification',
+        details: error.message
+      });
+    }
+  }
+);
+
 router.put(
   '/:id/archive',
   authenticate,
