@@ -594,8 +594,8 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
       }
       interviewsByApp[interview.application_id].push({
         status: interview.status,
-        score: interview.percentage, // Use calculated percentage
-        maxScore: 100, // Percentage is already on 100 scale
+        score: interview.percentage / 10, // Convert percentage (0-100) to score (0-10)
+        maxScore: 10, // Frontend expects score on 10 scale
         result: null,
         interviewerName: interview.interviewer_name
       });
