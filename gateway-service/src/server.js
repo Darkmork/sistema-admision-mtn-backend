@@ -75,6 +75,7 @@ const allowedOrigins = [
   'http://localhost:5174',
   'http://localhost:5175',
   'https://admision-mtn-front.vercel.app',
+  'https://admision-mtn-front-git-main-jorge-gangales-projects.vercel.app', // Vercel preview deployments
   process.env.CORS_ORIGIN
 ].filter(Boolean);
 
@@ -84,6 +85,7 @@ app.use(cors({
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.indexOf(origin) !== -1) {
+      logger.info(`[CORS] Allowing request from origin: ${origin}`);
       callback(null, true);
     } else {
       logger.warn(`[CORS] Blocked request from origin: ${origin}`);
@@ -117,7 +119,9 @@ app.use(cors({
     'User-Agent'
   ],
   exposedHeaders: ['Content-Range', 'X-Content-Range', 'x-request-id'],
-  maxAge: 600 // 10 minutes
+  maxAge: 600, // 10 minutes
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 // Request logging with request ID

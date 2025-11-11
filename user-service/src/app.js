@@ -52,6 +52,7 @@ const allowedOrigins = [
   'http://localhost:5174',
   'http://localhost:5175',
   'https://admision-mtn-front.vercel.app',
+  'https://admision-mtn-front-git-main-jorge-gangales-projects.vercel.app', // Vercel preview deployments
   process.env.CORS_ORIGIN || process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -59,6 +60,7 @@ app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) {
+      console.log(`[CORS] Allowing request from origin: ${origin}`);
       callback(null, true);
     } else {
       console.warn(`[CORS] Blocked request from origin: ${origin}`);
@@ -67,8 +69,21 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token', 'X-CSRF-Token'],
-  exposedHeaders: ['x-request-id']
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-csrf-token',
+    'X-CSRF-Token',
+    'x-correlation-id',
+    'x-request-time',
+    'x-timezone',
+    'x-client-type',
+    'x-request-id'
+  ],
+  exposedHeaders: ['x-request-id'],
+  maxAge: 600, // 10 minutes
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 // Middleware
