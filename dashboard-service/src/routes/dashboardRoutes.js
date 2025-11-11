@@ -499,22 +499,62 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
       `, [applicationIds])
     );
 
-    // Get detailed family interviews (individual scores from each interviewer)
-    // IMPORTANT: Use interviews table (score/10), NOT evaluations table (score/100)
-    const interviewsQuery = await mediumQueryBreaker.fire(async () =>
+    // Get detailed family interviews from evaluations table (FAMILY_INTERVIEW type)
+    // Calculate percentage using the same weighted formula as frontend:
+    // - Sections (max 20 points) = 90% weight
+    // - Observations (max 9 points) = 10% weight
+    const familyInterviewsQuery = await mediumQueryBreaker.fire(async () =>
       await client.query(`
+        WITH interview_scores AS (
+          SELECT
+            e.application_id,
+            e.status,
+            e.interview_data,
+            u.first_name || ' ' || u.last_name as interviewer_name,
+
+            -- Calculate section score (sum of all section responses)
+            (
+              COALESCE((e.interview_data->'section1'->'q1'->>'score')::int, 0) +
+              COALESCE((e.interview_data->'section1'->'q2_3basico_4medio'->>'score')::int, 0) +
+              COALESCE((e.interview_data->'section1'->'q3_5basico_3medio'->>'score')::int, 0) +
+              COALESCE((e.interview_data->'section1'->'q2_prekinder_2basico'->>'score')::int, 0) +
+              COALESCE((e.interview_data->'section1'->'q3_prekinder_4basico'->>'score')::int, 0) +
+              COALESCE((e.interview_data->'section2'->'q1'->>'score')::int, 0) +
+              COALESCE((e.interview_data->'section2'->'q2'->>'score')::int, 0) +
+              COALESCE((e.interview_data->'section3'->'q1'->>'score')::int, 0) +
+              COALESCE((e.interview_data->'section4'->'q1'->>'score')::int, 0)
+            ) as section_score,
+
+            -- Calculate observation score (checklist + overall opinion)
+            (
+              -- Checklist items (obs2, obs3, obs4 each worth 1pt if checked)
+              CASE WHEN (e.interview_data->'observations'->'checklist'->>'obs2')::boolean THEN 1 ELSE 0 END +
+              CASE WHEN (e.interview_data->'observations'->'checklist'->>'obs3')::boolean THEN 1 ELSE 0 END +
+              CASE WHEN (e.interview_data->'observations'->'checklist'->>'obs4')::boolean THEN 1 ELSE 0 END +
+              -- Overall opinion score (up to 5 points)
+              COALESCE((e.interview_data->'observations'->'overallOpinion'->>'score')::int, 0)
+            ) as observation_score
+
+          FROM evaluations e
+          LEFT JOIN users u ON e.evaluator_id = u.id
+          WHERE e.evaluation_type = 'FAMILY_INTERVIEW'
+            AND e.status = 'COMPLETED'
+            AND e.interview_data IS NOT NULL
+            AND e.application_id = ANY($1)
+        )
         SELECT
-          i.application_id,
-          i.type as interview_type,
-          i.status,
-          i.score,
-          10 as max_score,
-          i.result,
-          u.first_name || ' ' || u.last_name as interviewer_name
-        FROM interviews i
-        LEFT JOIN users u ON u.id = i.interviewer_user_id
-        WHERE i.type = 'FAMILY'
-          AND i.application_id = ANY($1)
+          application_id,
+          status,
+          interviewer_name,
+          section_score,
+          observation_score,
+          -- Apply weighted formula: (section/20 * 90) + (observation/9 * 10)
+          ROUND(
+            LEAST(100, GREATEST(0,
+              (section_score::numeric / 20 * 90) + (observation_score::numeric / 9 * 10)
+            ))
+          ) as percentage
+        FROM interview_scores
       `, [applicationIds])
     );
 
@@ -545,17 +585,17 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
       });
     });
 
-    // Map interviews by application_id
+    // Map family interviews by application_id
     const interviewsByApp = {};
-    interviewsQuery.rows.forEach(interview => {
+    familyInterviewsQuery.rows.forEach(interview => {
       if (!interviewsByApp[interview.application_id]) {
         interviewsByApp[interview.application_id] = [];
       }
       interviewsByApp[interview.application_id].push({
         status: interview.status,
-        score: interview.score,
-        maxScore: interview.max_score || 10, // Default to 10 for interviews table
-        result: interview.result,
+        score: interview.percentage, // Use calculated percentage
+        maxScore: 100, // Percentage is already on 100 scale
+        result: null,
         interviewerName: interview.interviewer_name
       });
     });
