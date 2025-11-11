@@ -528,7 +528,8 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
 
             -- Calculate observation score (checklist + overall opinion)
             (
-              -- Checklist items (obs2, obs3, obs4 each worth 1pt if checked)
+              -- Checklist items (obs1, obs2, obs3, obs4 each worth 1pt if checked)
+              CASE WHEN (e.interview_data->'observations'->'checklist'->>'obs1')::boolean THEN 1 ELSE 0 END +
               CASE WHEN (e.interview_data->'observations'->'checklist'->>'obs2')::boolean THEN 1 ELSE 0 END +
               CASE WHEN (e.interview_data->'observations'->'checklist'->>'obs3')::boolean THEN 1 ELSE 0 END +
               CASE WHEN (e.interview_data->'observations'->'checklist'->>'obs4')::boolean THEN 1 ELSE 0 END +
