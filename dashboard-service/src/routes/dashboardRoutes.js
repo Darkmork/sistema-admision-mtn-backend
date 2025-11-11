@@ -504,14 +504,14 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
       await client.query(`
         SELECT
           i.application_id,
-          i.interview_type,
+          i.type as interview_type,
           i.status,
           i.score,
           i.result,
           u.first_name || ' ' || u.last_name as interviewer_name
         FROM interviews i
         LEFT JOIN users u ON u.id = i.interviewer_user_id
-        WHERE i.interview_type = 'FAMILY'
+        WHERE i.type = 'FAMILY'
           AND i.application_id = ANY($1)
       `, [applicationIds])
     );
