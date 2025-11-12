@@ -535,7 +535,10 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
               CASE WHEN (e.interview_data->'observations'->'checklist'->>'obs4')::boolean THEN 1 ELSE 0 END +
               -- Overall opinion score (up to 5 points)
               COALESCE((e.interview_data->'observations'->'overallOpinion'->>'score')::int, 0)
-            ) as observation_score
+            ) as observation_score,
+
+            -- Extract overall opinion score separately (1-5 scale)
+            COALESCE((e.interview_data->'observations'->'overallOpinion'->>'score')::int, 0) as overall_opinion_score
 
           FROM evaluations e
           LEFT JOIN users u ON e.evaluator_id = u.id
@@ -550,6 +553,7 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
           interviewer_name,
           section_score,
           observation_score,
+          overall_opinion_score,
           -- Apply weighted formula: (section/20 * 90) + (observation/9 * 10)
           ROUND(
             LEAST(100, GREATEST(0,
@@ -598,7 +602,8 @@ router.get('/applicant-metrics', authenticate, requireRole('ADMIN', 'COORDINATOR
         score: interview.percentage / 10, // Convert percentage (0-100) to score (0-10)
         maxScore: 10, // Frontend expects score on 10 scale
         result: null,
-        interviewerName: interview.interviewer_name
+        interviewerName: interview.interviewer_name,
+        overallOpinionScore: interview.overall_opinion_score // Overall opinion rating (1-5 scale)
       });
     });
 
