@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 const cache = require('../config/cache');
 const { simpleQueryBreaker, mediumQueryBreaker, heavyQueryBreaker } = require('../config/circuitBreakers');
 
-// Force redeploy - 2025-11-11 18:20 - overallOpinionScore deployment
+// Force redeploy - 2025-11-11 18:25 - overallOpinionScore deployment v2
 /**
  * @route   GET /api/dashboard/stats
  * @desc    Get general dashboard statistics
